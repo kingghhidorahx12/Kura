@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "MediMind",
+    "slug": "medimind",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/medimind-logo-generated.png",
+    "splash": {
+      "image": "./assets/medimind-logo-generated.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#17211f"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.medimind.app",
+      "buildNumber": "1",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "MediMind usa la camara para guardar y escanear la foto de tu receta.",
+        "NSPhotoLibraryUsageDescription": "MediMind usa tu galeria para seleccionar fotos de recetas."
+      }
+    },
+    "android": {
+      "package": "com.medimind.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/medimind-logo-generated.png",
+        "backgroundColor": "#17211f"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
+        "POST_NOTIFICATIONS",
+        "SCHEDULE_EXACT_ALARM"
+      ]
+    },
+    "plugins": [
+      "expo-notifications",
+      "expo-image-picker"
+    ]
+  }
+}

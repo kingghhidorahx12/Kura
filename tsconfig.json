@@ -1,0 +1,16 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitReturns": true
+  },
+  "exclude": [
+    "node_modules",
+    "work",
+    "outputs",
+    ".expo",
+    ".expo-home",
+    ".dotslash-cache",
+    ".npm-cache"
+  ]
+}
