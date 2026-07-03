@@ -6,11 +6,6 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/medimind-logo-generated.png",
-    "splash": {
-      "image": "./assets/medimind-logo-generated.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#17211f"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -26,6 +21,7 @@
     "android": {
       "package": "com.medimind.app",
       "versionCode": 1,
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/medimind-logo-generated.png",
         "backgroundColor": "#17211f"

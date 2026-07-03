@@ -97,3 +97,4 @@ El flujo visual ya existe: numero, enviar codigo y validar codigo. Para SMS real
 - Celular ya tiene el flujo correcto de enviar codigo y verificarlo, pero el SMS real requiere activar Phone Auth.
 - Sin configuracion Firebase, MediMind sigue funcionando con correo/celular local para pruebas.
 - Los botones sociales ya no crean sesiones falsas si Firebase no esta conectado.
+- Los datos externos que faltan para Google, Facebook, SMS real y donaciones estan listados en `EXTERNAL_SERVICES.md`.

@@ -15,6 +15,7 @@
    - Notificacion de prueba.
    - Recordatorio real programado.
    - Acciones de notificacion: Completado, Posponer y Omitir.
+6. Revisar `EXTERNAL_SERVICES.md` antes de activar Google, Facebook, SMS real o Donar en una build publica.
 
 ## Version instalada
 

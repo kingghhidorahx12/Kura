@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { StatusBar } from "expo-status-bar";
 import * as ImagePicker from "expo-image-picker";
+import * as LocalAuthentication from "expo-local-authentication";
 import * as Notifications from "expo-notifications";
 import {
   Accessibility,
@@ -40,7 +40,6 @@ import {
 } from "lucide-react-native";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
   Image,
   KeyboardAvoidingView,
@@ -51,6 +50,7 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  StatusBar as NativeStatusBar,
   Text,
   TextInput,
   View
@@ -105,7 +105,7 @@ type HistoryDateFilter = "today" | "custom" | "all";
 type AgeUnit = "years" | "months";
 type AuthMode = "login" | "signup" | "recover";
 type AuthMethod = "email" | "phone";
-type DoctorPrefix = "Dr." | "Dra." | "Med.";
+type DoctorPrefix = string;
 type AuthUser = {
   id: string;
   name: string;
@@ -128,10 +128,55 @@ type ConfirmationState = {
   danger?: boolean;
   onConfirm: () => void;
 };
+type ChoiceAction = {
+  label: string;
+  tone?: "primary" | "secondary" | "danger";
+  onPress: () => void;
+};
+type ChoiceState = {
+  title: string;
+  message: string;
+  actions: ChoiceAction[];
+  onClose?: () => void;
+};
 type TextExtractorModule = {
   isSupported: boolean;
   extractTextFromImage: (uri: string) => Promise<string[]>;
 };
+type NoticeState = {
+  title: string;
+  message: string;
+  tone?: "info" | "success" | "warning" | "danger";
+};
+type MedicationDraftErrorState = {
+  name: boolean;
+  unitLabel: boolean;
+  dose: boolean;
+  frequencyMinutes: boolean;
+  durationDays: boolean;
+  containerCount: boolean;
+  unitsPerContainer: boolean;
+};
+type TutorialStep = {
+  tab: TabKey;
+  target: string;
+  title: string;
+  message: string;
+  final?: boolean;
+};
+
+const dropdownClosers = new Set<() => void>();
+
+function registerDropdownCloser(close: () => void) {
+  dropdownClosers.add(close);
+  return () => {
+    dropdownClosers.delete(close);
+  };
+}
+
+function closeOpenDropdowns() {
+  dropdownClosers.forEach((close) => close());
+}
 
 const APP_NAME = "MediMind";
 const MEDIMIND_LOGO = require("./assets/medimind-logo-generated.png");
@@ -140,7 +185,9 @@ const AUTH_STORAGE_KEY = "medimind-auth-v1";
 const USERS_STORAGE_KEY = "medimind-users-v1";
 const APP_VERSION = "1.0.0";
 const DEVELOPER_GITHUB = "KingGhidoraX12";
-const DONATION_URL = `https://github.com/sponsors/${DEVELOPER_GITHUB}`;
+const PAYPAL_DONATION_URL = "";
+const MERCADO_PAGO_DONATION_URL = "";
+const DONATION_URL = MERCADO_PAGO_DONATION_URL || PAYPAL_DONATION_URL;
 const CONTACT_EMAIL = "kingghidorahx12@gmail.com";
 const CONTACT_WHATSAPP = "527121709077";
 const ADMIN_IDENTIFIERS = [CONTACT_EMAIL, "kingghidorahx12", "kingghidorax12"];
@@ -152,7 +199,29 @@ const NOTIFICATION_ACTION_SKIP = "MEDIMIND_SKIP";
 
 const colorOptions = ["#4f8b67", "#e78382", "#8eb7c8", "#b7a9cf", "#f0a868"];
 const unitOptions = ["Tabletas", "Capsulas", "Mililitros", "Gotas", "Sobres", "Dosis"];
-const doctorPrefixOptions: DoctorPrefix[] = ["Dr.", "Dra.", "Med."];
+const doctorPrefixOptions: DoctorPrefix[] = [
+  "Dr.",
+  "Dra.",
+  "Médico",
+  "Médica",
+  "Psic.",
+  "Psicólogo",
+  "Psicóloga",
+  "Lic.",
+  "Licda.",
+  "Enfermero",
+  "Enfermera",
+  "Nutriólogo",
+  "Nutrióloga",
+  "Odontólogo",
+  "Odontóloga",
+  "Pediatra",
+  "Ginecólogo",
+  "Ginecóloga",
+  "Otro"
+];
+const STATUS_BAR_OFFSET = Platform.OS === "android" ? NativeStatusBar.currentHeight ?? 0 : 0;
+const SCREEN_TOP_GAP = STATUS_BAR_OFFSET + 14;
 const frequencyPresets = [
   { label: "30 min", minutes: 30 },
   { label: "1 h", minutes: 60 },
@@ -160,6 +229,51 @@ const frequencyPresets = [
   { label: "8 h", minutes: 480 },
   { label: "12 h", minutes: 720 },
   { label: "24 h", minutes: 1440 }
+];
+const tutorialSteps: TutorialStep[] = [
+  {
+    tab: "profile",
+    target: "Boton Agregar perfil",
+    title: "Primero crea un perfil",
+    message: "Crea el perfil de la persona que usara MediMind. Asi cada receta, inventario e historial queda separado."
+  },
+  {
+    tab: "recipes",
+    target: "Boton Agregar receta",
+    title: "Registra una receta",
+    message: "Agrega el tratamiento, sus medicamentos y los horarios. La foto puede quedarse solo como referencia."
+  },
+  {
+    tab: "today",
+    target: "Siguiente dosis",
+    title: "Revisa lo que toca ahora",
+    message: "Aqui aparece la dosis mas cercana. Desde ahi puedes marcarla como completada, posponerla u omitirla."
+  },
+  {
+    tab: "today",
+    target: "Siguientes dosis",
+    title: "Mira lo que viene",
+    message: "Esta seccion muestra la dosis actual y las proximas tomas para que no pierdas el ritmo del tratamiento."
+  },
+  {
+    tab: "inventory",
+    target: "Agregar, Ajustar y Borrar",
+    title: "Cuida el inventario",
+    message: "Agrega frascos o unidades, ajusta lo que queda y borra inventario cuando necesites reiniciarlo."
+  },
+  {
+    tab: "history",
+    target: "Filtros e historial",
+    title: "Consulta el registro",
+    message: "Filtra por tratamiento y fecha para revisar lo completado, pendiente, pospuesto u omitido."
+  },
+  {
+    tab: "profile",
+    target: "Boton Donar",
+    title: "Gracias por usar MediMind",
+    message: "Si la app te ayuda, puedes apoyar el proyecto con un cafe desde el boton Donar cuando este configurado.",
+    final: true
+  }
 ];
 
 const tabs: Array<{ key: TabKey; label: string; icon: IconType }> = [
@@ -750,6 +864,9 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [authHydrated, setAuthHydrated] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [storedAuthUser, setStoredAuthUser] = useState<AuthUser | null>(null);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricChecking, setBiometricChecking] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [authMethod, setAuthMethod] = useState<AuthMethod>("email");
   const [authName, setAuthName] = useState("");
@@ -768,12 +885,16 @@ export default function App() {
   const [hydrated, setHydrated] = useState(false);
   const [tutorialSeen, setTutorialSeen] = useState(false);
   const [tutorialModalOpen, setTutorialModalOpen] = useState(false);
+  const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
+  const screenTransition = useRef(new Animated.Value(1)).current;
 
   const [recipeModalOpen, setRecipeModalOpen] = useState(false);
   const [recipeStep, setRecipeStep] = useState<RecipeStep>("photo");
   const [recipeTitle, setRecipeTitle] = useState("");
   const [recipeDoctorPrefix, setRecipeDoctorPrefix] = useState<DoctorPrefix>("Dr.");
   const [recipeDoctor, setRecipeDoctor] = useState("");
+  const [recipeValidationAttempted, setRecipeValidationAttempted] = useState(false);
+  const [medicationValidationAttempted, setMedicationValidationAttempted] = useState(false);
   const [recipePhotoUri, setRecipePhotoUri] = useState<string | undefined>();
   const [recipeSource, setRecipeSource] = useState<Recipe["source"]>("photo");
   const [wizardDrafts, setWizardDrafts] = useState<WizardMedicationDraft[]>([emptyWizardDraft()]);
@@ -823,6 +944,8 @@ export default function App() {
   const [skipEventId, setSkipEventId] = useState("");
   const [skipReason, setSkipReason] = useState("");
   const [confirmation, setConfirmation] = useState<ConfirmationState | null>(null);
+  const [choiceModal, setChoiceModal] = useState<ChoiceState | null>(null);
+  const [notice, setNotice] = useState<NoticeState | null>(null);
   const [nowTick, setNowTick] = useState(() => new Date());
 
   useEffect(() => {
@@ -916,6 +1039,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    screenTransition.setValue(0);
+    Animated.timing(screenTransition, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true
+    }).start();
+  }, [screenTransition, tab]);
+
+  useEffect(() => {
     if (!hydrated) {
       return;
     }
@@ -952,7 +1084,7 @@ export default function App() {
       if (response.actionIdentifier === NOTIFICATION_ACTION_TAKEN) {
         void updateDoseStatus(eventId, "taken").then(() => {
           void sendActionFeedbackNotification("Dosis completada", "Bien hecho. MediMind actualizo tu tratamiento.");
-          Alert.alert("Bien hecho", "Dosis marcada como completada.");
+          showNotice("Bien hecho", "Dosis marcada como completada.", "success");
         });
         return;
       }
@@ -960,7 +1092,7 @@ export default function App() {
       if (response.actionIdentifier === NOTIFICATION_ACTION_SNOOZE) {
         void updateDoseStatus(eventId, "snoozed").then(() => {
           void sendActionFeedbackNotification("Dosis pospuesta", "Te recordare en 10 minutos. Cuida el ritmo del tratamiento.");
-          Alert.alert("Dosis pospuesta", "Te recordare otra vez en 10 minutos. Cuida el ritmo del tratamiento.");
+          showNotice("Dosis pospuesta", "Te recordare otra vez en 10 minutos. Cuida el ritmo del tratamiento.", "warning");
         });
         return;
       }
@@ -968,7 +1100,7 @@ export default function App() {
       if (response.actionIdentifier === NOTIFICATION_ACTION_SKIP) {
         void updateDoseStatus(eventId, "skipped", { skippedReason: "Omitida desde la notificacion" }).then(() => {
           void sendActionFeedbackNotification("Dosis omitida", "Quedo registrada. Revisa el ritmo del tratamiento cuando puedas.");
-          Alert.alert("Dosis omitida", "Quedo registrada. Si puedes, revisa el ritmo del tratamiento.");
+          showNotice("Dosis omitida", "Quedo registrada. Si puedes, revisa el ritmo del tratamiento.", "warning");
         });
         return;
       }
@@ -1098,6 +1230,11 @@ export default function App() {
     })
     .filter(Boolean) as Array<{ id: string; title: string; message: string }>;
   const currentWizardDraft = wizardDrafts[activeWizardIndex] ?? wizardDrafts[0];
+  const visibleRecipeErrors = recipeValidationAttempted ? recipeDetailErrors() : { title: false, doctor: false };
+  const visibleMedicationErrors = medicationValidationAttempted
+    ? medicationDraftErrors(currentWizardDraft)
+    : { name: false, unitLabel: false, dose: false, frequencyMinutes: false, durationDays: false, containerCount: false, unitsPerContainer: false };
+  const currentTutorialStep = tutorialSteps[tutorialStepIndex] ?? tutorialSteps[0];
   const inventoryMedication = medications.find((medication) => medication.id === inventoryMedicationId);
   const editingRecipe = recipes.find((recipe) => recipe.id === editingRecipeId);
   const editingRecipeMedications = medications.filter((medication) => medication.recipeId === editingRecipeId);
@@ -1158,6 +1295,8 @@ export default function App() {
     setRecipeTitle("");
     setRecipeDoctorPrefix("Dr.");
     setRecipeDoctor("");
+    setRecipeValidationAttempted(false);
+    setMedicationValidationAttempted(false);
     setRecipePhotoUri(undefined);
     setRecipeSource("photo");
     setWizardDrafts([emptyWizardDraft()]);
@@ -1175,6 +1314,10 @@ export default function App() {
     setAuthSecret("");
     setAuthNotice("");
     setPhoneCodeState(null);
+  }
+
+  function showNotice(title: string, message: string, tone: NoticeState["tone"] = "info") {
+    setNotice({ title, message, tone });
   }
 
   async function saveLocalUsers(nextUsers: LocalUserRecord[]) {
@@ -1212,7 +1355,7 @@ export default function App() {
   function sendPhoneCode() {
     const identifier = authIdentifier.trim();
     if (!identifier) {
-      Alert.alert("Falta el celular", "Escribe tu numero celular para enviar el codigo.");
+      showNotice("Falta el celular", "Escribe tu numero celular para enviar el codigo.", "warning");
       return;
     }
     if (authMode === "login" && !findLocalUser("phone", identifier) && !hasFirebaseConfig()) {
@@ -1236,7 +1379,7 @@ export default function App() {
 
   function validatePhoneCode(identifier: string, secret: string) {
     if (!phoneCodeState || phoneCodeState.identifier !== identifier) {
-      Alert.alert("Envia el codigo", "Primero envia el codigo de verificacion al celular.");
+      showNotice("Envia el codigo", "Primero envia el codigo de verificacion al celular.", "warning");
       return false;
     }
     if (Date.now() > phoneCodeState.expiresAt) {
@@ -1245,7 +1388,7 @@ export default function App() {
       return false;
     }
     if (!secret || secret !== phoneCodeState.code) {
-      Alert.alert("Codigo incorrecto", "Revisa el codigo e intentalo de nuevo.");
+      showNotice("Codigo incorrecto", "Revisa el codigo e intentalo de nuevo.", "danger");
       return false;
     }
     return true;
@@ -1300,7 +1443,7 @@ export default function App() {
     const secret = authSecret.trim();
 
     if (!identifier) {
-      Alert.alert("Falta un dato", authMethod === "email" ? "Escribe tu correo." : "Escribe tu numero celular.");
+      showNotice("Falta un dato", authMethod === "email" ? "Escribe tu correo." : "Escribe tu numero celular.", "warning");
       return;
     }
 
@@ -1343,7 +1486,7 @@ export default function App() {
     }
 
     if (authMode === "signup" && !authName.trim()) {
-      Alert.alert("Falta tu nombre", "Agrega tu nombre para crear la cuenta.");
+      showNotice("Falta tu nombre", "Agrega tu nombre para crear la cuenta.", "warning");
       return;
     }
 
@@ -1352,7 +1495,7 @@ export default function App() {
         return;
       }
     } else if (!secret) {
-      Alert.alert("Falta la clave", "Escribe tu contrasena.");
+      showNotice("Falta la clave", "Escribe tu contrasena.", "warning");
       return;
     }
 
@@ -1368,14 +1511,14 @@ export default function App() {
           return;
         }
       } catch (error) {
-        Alert.alert("No se pudo iniciar sesion", firebaseErrorMessage(error));
+        showNotice("No se pudo iniciar sesion", firebaseErrorMessage(error), "danger");
         return;
       }
     }
 
     if (authMode === "signup") {
       if (findLocalUser(authMethod, identifier)) {
-        Alert.alert("Cuenta existente", authMethod === "email" ? "Ese correo ya tiene una cuenta." : "Ese celular ya tiene una cuenta.");
+        showNotice("Cuenta existente", authMethod === "email" ? "Ese correo ya tiene una cuenta." : "Ese celular ya tiene una cuenta.", "warning");
         return;
       }
       const user = await registerLocalUser(authMethod, identifier, authName, authMethod === "email" ? secret : undefined);
@@ -1386,11 +1529,11 @@ export default function App() {
 
     const user = findLocalUser(authMethod, identifier);
     if (!user) {
-      Alert.alert("Cuenta no encontrada", "Primero crea una cuenta para poder iniciar sesion.");
+      showNotice("Cuenta no encontrada", "Primero crea una cuenta para poder iniciar sesion.", "warning");
       return;
     }
     if (authMethod === "email" && user.secret && user.secret !== secret) {
-      Alert.alert("Datos incorrectos", "La contrasena no coincide con esa cuenta.");
+      showNotice("Datos incorrectos", "La contrasena no coincide con esa cuenta.", "danger");
       return;
     }
     await saveAuthUser(user);
@@ -1412,12 +1555,12 @@ export default function App() {
           return;
         }
       } catch (error) {
-        Alert.alert("No se pudo iniciar sesion", firebaseErrorMessage(error));
+        showNotice("No se pudo iniciar sesion", firebaseErrorMessage(error), "danger");
         return;
       }
     }
 
-    Alert.alert("OAuth nativo pendiente", "Google y Facebook en la app instalada necesitan los Client ID nativos y el flujo OAuth de Expo antes de publicar V1.");
+    showNotice("OAuth nativo pendiente", "Google y Facebook en la app instalada necesitan los Client ID nativos y el flujo OAuth de Expo antes de publicar V1.", "warning");
   }
 
   async function signOut() {
@@ -1436,7 +1579,7 @@ export default function App() {
 
   function openRecipeWizard() {
     if (!selectedProfileId || profiles.length === 0) {
-      Alert.alert("Primero agrega un perfil", "Asi MediMind sabra para quien es la receta.");
+      showNotice("Primero agrega un perfil", "Asi MediMind sabra para quien es la receta.", "warning");
       setTab("profile");
       openProfileModal();
       return;
@@ -1452,7 +1595,7 @@ export default function App() {
         : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      Alert.alert("Permiso pendiente", "Necesitamos permiso para guardar la foto de la receta.");
+      showNotice("Permiso pendiente", "Necesitamos permiso para guardar la foto de la receta.", "warning");
       return;
     }
 
@@ -1475,18 +1618,16 @@ export default function App() {
 
   function requestRecipeScan() {
     if (!recipePhotoUri) {
-      Alert.alert("Primero la foto", "Toma o elige una foto de la receta para poder escanearla.");
+      showNotice("Primero la foto", "Toma o elige una foto de la receta para poder escanearla.", "warning");
       return;
     }
 
-    Alert.alert(
-      "Revisa el escaneo",
-      "El escaneo puede cometer errores. MediMind llenara lo que detecte, pero revisa cada campo antes de activar las alarmas.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Escanear", onPress: () => void runRecipeScan() }
-      ]
-    );
+    requestConfirmation({
+      title: "Revisa el escaneo",
+      message: "El escaneo esta en pruebas y puede cometer errores. MediMind llenara lo que detecte, pero revisa cada campo antes de activar las alarmas.",
+      confirmLabel: "Escanear",
+      onConfirm: () => void runRecipeScan()
+    });
   }
 
   async function runRecipeScan() {
@@ -1527,9 +1668,10 @@ export default function App() {
       );
       setRecipeStep("medications");
     } catch {
-      Alert.alert(
+      showNotice(
         "Escaneo no disponible",
-        "No pude leer esta receta en esta vista. En Expo Go puede requerir una build instalada con OCR; mientras tanto puedes usar la foto como referencia y llenar los campos manualmente."
+        "No pude leer esta receta en esta vista. En Expo Go puede requerir una build instalada con OCR; mientras tanto puedes usar la foto como referencia y llenar los campos manualmente.",
+        "warning"
       );
     } finally {
       setScanLoading(false);
@@ -1549,48 +1691,35 @@ export default function App() {
     );
   }
 
+  function recipeDetailErrors() {
+    return {
+      title: !recipeTitle.trim(),
+      doctor: !recipeDoctor.trim()
+    };
+  }
+
+  function medicationDraftErrors(draft: NewMedicationDraft): MedicationDraftErrorState {
+    return {
+      name: !draft.name.trim(),
+      unitLabel: !draft.unitLabel.trim(),
+      dose: !(Number(draft.dose) > 0),
+      frequencyMinutes: !(draft.frequencyMinutes > 0),
+      durationDays: !(draft.durationDays > 0),
+      containerCount: !(draft.containerCount > 0),
+      unitsPerContainer: !(draft.unitsPerContainer > 0)
+    };
+  }
+
   function validateRecipeDetails() {
-    if (!recipeTitle.trim()) {
-      Alert.alert("Falta el tratamiento", "Agrega el nombre del tratamiento o diagnostico.");
-      return false;
-    }
-    if (!recipeDoctor.trim()) {
-      Alert.alert("Falta el doctor", "Agrega el nombre del doctor o doctora.");
-      return false;
-    }
-    return true;
+    setRecipeValidationAttempted(true);
+    const errors = recipeDetailErrors();
+    return !Object.values(errors).some(Boolean);
   }
 
   function validateMedicationDraft(draft: NewMedicationDraft) {
-    if (!draft.name.trim()) {
-      Alert.alert("Falta medicamento", "Agrega el nombre del medicamento.");
-      return false;
-    }
-    if (!draft.unitLabel.trim()) {
-      Alert.alert("Falta unidad", "Selecciona la unidad del medicamento.");
-      return false;
-    }
-    if (!(Number(draft.dose) > 0)) {
-      Alert.alert("Falta dosis", "Agrega la dosis indicada.");
-      return false;
-    }
-    if (!(draft.frequencyMinutes > 0)) {
-      Alert.alert("Falta frecuencia", "Selecciona cada cuanto se toma.");
-      return false;
-    }
-    if (!(draft.durationDays > 0)) {
-      Alert.alert("Falta duracion", "Agrega por cuantos dias sera el tratamiento.");
-      return false;
-    }
-    if (!(draft.containerCount > 0)) {
-      Alert.alert("Falta inventario", "Agrega cuantos frascos o cajas tienes.");
-      return false;
-    }
-    if (!(draft.unitsPerContainer > 0)) {
-      Alert.alert("Falta inventario", "Agrega el total que trae cada frasco o caja.");
-      return false;
-    }
-    return true;
+    setMedicationValidationAttempted(true);
+    const errors = medicationDraftErrors(draft);
+    return !Object.values(errors).some(Boolean);
   }
 
   function saveCurrentWizardMedication() {
@@ -1598,6 +1727,7 @@ export default function App() {
       return;
     }
 
+    setMedicationValidationAttempted(false);
     setWizardDrafts((current) =>
       current.map((item, index) =>
         index === activeWizardIndex
@@ -1614,6 +1744,7 @@ export default function App() {
   function addAnotherWizardMedication() {
     setWizardDrafts((current) => [...current, emptyWizardDraft()]);
     setActiveWizardIndex(wizardDrafts.length);
+    setMedicationValidationAttempted(false);
   }
 
   function editCurrentWizardMedication() {
@@ -1632,7 +1763,7 @@ export default function App() {
   function goToAlarmStep() {
     const hasSavedMedication = wizardDrafts.some((item) => item.confirmed);
     if (!hasSavedMedication) {
-      Alert.alert("Falta medicamento", "Guarda al menos un medicamento antes de finalizar la receta.");
+      showNotice("Falta medicamento", "Guarda al menos un medicamento antes de finalizar la receta.", "warning");
       return;
     }
     setRecipeStep("alarms");
@@ -1665,15 +1796,37 @@ export default function App() {
 
   function askPastDoseHandling(count: number): Promise<"taken" | "pending" | "cancel"> {
     return new Promise((resolve) => {
-      Alert.alert(
-        "Hora de inicio pasada",
-        `Por la hora de inicio, ya hay ${count} dosis que debieron tomarse. ¿Quieres marcarlas como completadas?`,
-        [
-          { text: "Cancelar", style: "cancel", onPress: () => resolve("cancel") },
-          { text: "Dejarlas pendientes", onPress: () => resolve("pending") },
-          { text: "Si, ya se tomaron", onPress: () => resolve("taken") }
+      setChoiceModal({
+        title: "Hora de inicio pasada",
+        message: `Por la hora de inicio, ya hay ${count} dosis que debieron tomarse. ¿Quieres marcarlas como completadas?`,
+        onClose: () => resolve("cancel"),
+        actions: [
+          {
+            label: "Cancelar",
+            tone: "secondary",
+            onPress: () => {
+              setChoiceModal(null);
+              resolve("cancel");
+            }
+          },
+          {
+            label: "Dejarlas pendientes",
+            tone: "secondary",
+            onPress: () => {
+              setChoiceModal(null);
+              resolve("pending");
+            }
+          },
+          {
+            label: "Si, ya se tomaron",
+            tone: "primary",
+            onPress: () => {
+              setChoiceModal(null);
+              resolve("taken");
+            }
+          }
         ]
-      );
+      });
     });
   }
 
@@ -1685,7 +1838,7 @@ export default function App() {
 
     const confirmedDrafts = wizardDrafts.filter((item) => item.confirmed);
     if (confirmedDrafts.length === 0) {
-      Alert.alert("Falta medicamento", "Guarda al menos un medicamento antes de activar alarmas.");
+      showNotice("Falta medicamento", "Guarda al menos un medicamento antes de activar alarmas.", "warning");
       return;
     }
 
@@ -1770,13 +1923,14 @@ export default function App() {
     resetRecipeWizard();
     setTab("today");
     const alarmCount = scheduledEvents.filter((event) => event.notificationId).length;
-    Alert.alert(
+    showNotice(
       "Receta lista",
       Platform.OS === "web"
         ? "La receta quedo guardada. En navegador no se pueden mandar notificaciones del telefono; hay que probarlas en la app instalada."
         : alarmCount > 0
         ? "Las alarmas del telefono quedaron preparadas para esta receta."
-        : "La receta quedo guardada. Revisa los permisos de notificaciones para que suenen las alarmas."
+        : "La receta quedo guardada. Revisa los permisos de notificaciones para que suenen las alarmas.",
+      alarmCount > 0 ? "success" : "warning"
     );
   }
 
@@ -1784,7 +1938,7 @@ export default function App() {
     if (Platform.OS === "web") {
       const message = "En navegador no se pueden mandar notificaciones del telefono. Esta prueba hay que hacerla desde la app instalada.";
       setNotificationTestNotice(message);
-      Alert.alert("Prueba no disponible", message);
+      showNotice("Prueba no disponible", message, "warning");
       return;
     }
 
@@ -1793,7 +1947,7 @@ export default function App() {
     if (!allowed) {
       const message = "Activa las notificaciones del telefono para que MediMind pueda recordarte las dosis.";
       setNotificationTestNotice(message);
-      Alert.alert("Permiso pendiente", message);
+      showNotice("Permiso pendiente", message, "warning");
       return;
     }
 
@@ -1810,11 +1964,11 @@ export default function App() {
         trigger: null
       });
       setNotificationTestNotice("Prueba enviada. Debe aparecer una notificacion del telefono ahora.");
-      Alert.alert("Prueba enviada", "Debe aparecer una notificacion del telefono ahora.");
+      showNotice("Prueba enviada", "Debe aparecer una notificacion del telefono ahora.", "success");
     } catch {
       const message = "El telefono no acepto la notificacion de prueba. Revisa permisos de la app y ahorro de bateria.";
       setNotificationTestNotice(message);
-      Alert.alert("No se pudo probar", message);
+      showNotice("No se pudo probar", message, "danger");
     }
   }
 
@@ -2106,7 +2260,7 @@ export default function App() {
 
   function saveProfile() {
     if (!profileName.trim()) {
-      Alert.alert("Falta el nombre", "Agrega el nombre del perfil para continuar.");
+      showNotice("Falta el nombre", "Agrega el nombre del perfil para continuar.", "warning");
       return;
     }
 
@@ -2131,13 +2285,13 @@ export default function App() {
 
     setProfileModalOpen(false);
     if (creatingFirstProfile && !tutorialSeen) {
-      setTutorialModalOpen(true);
+      startTutorial();
     }
   }
 
   function deleteProfile(profileId: string) {
     if (profiles.length <= 1) {
-      Alert.alert("No se puede eliminar", "Necesitas conservar al menos un perfil.");
+      showNotice("No se puede eliminar", "Necesitas conservar al menos un perfil.", "warning");
       return;
     }
 
@@ -2182,6 +2336,15 @@ export default function App() {
   }
 
   function openDonation() {
+    if (!DONATION_URL) {
+      showNotice(
+        "Donacion pendiente",
+        "Para activar este boton agrega un link real de Mercado Pago o PayPal.me. Para Mexico conviene dejar ambas opciones disponibles.",
+        "info"
+      );
+      return;
+    }
+
     void Linking.openURL(DONATION_URL);
   }
 
@@ -2222,15 +2385,34 @@ export default function App() {
     action?.();
   }
 
+  function startTutorial(stepIndex = 0) {
+    const safeIndex = Math.min(Math.max(stepIndex, 0), tutorialSteps.length - 1);
+    setTutorialStepIndex(safeIndex);
+    setTab(tutorialSteps[safeIndex].tab);
+    setTutorialModalOpen(true);
+  }
+
+  function advanceTutorial() {
+    const nextIndex = tutorialStepIndex + 1;
+    if (nextIndex >= tutorialSteps.length) {
+      finishTutorial();
+      return;
+    }
+
+    setTutorialStepIndex(nextIndex);
+    setTab(tutorialSteps[nextIndex].tab);
+  }
+
   function finishTutorial() {
     setTutorialSeen(true);
     setTutorialModalOpen(false);
+    setTutorialStepIndex(0);
   }
 
   function renderSplash() {
     return (
       <SafeAreaView style={styles.safe}>
-        <StatusBar style="light" />
+        <AppStatusBar />
         <View style={styles.splashScreen}>
           <Image source={MEDIMIND_LOGO} style={styles.splashLogo} resizeMode="contain" />
           <Text style={styles.splashTitle}>{APP_NAME}</Text>
@@ -2248,8 +2430,16 @@ export default function App() {
 
     return (
       <SafeAreaView style={styles.safe}>
-        <StatusBar style="light" />
-        <ScrollView style={styles.authScroll} contentContainerStyle={styles.authScreen} showsVerticalScrollIndicator={false}>
+        <AppStatusBar />
+        <KeyboardAvoidingView style={styles.keyboardScreen} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <ScrollView
+          style={styles.authScroll}
+          contentContainerStyle={styles.authScreen}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.authBrand}>
             <Image source={MEDIMIND_LOGO} style={styles.authLogo} resizeMode="contain" />
             <Text style={styles.authAppName}>{APP_NAME}</Text>
@@ -2353,6 +2543,7 @@ export default function App() {
             ) : null}
           </View>
         </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     );
   }
@@ -2851,6 +3042,10 @@ export default function App() {
               <Text style={styles.secondaryButtonText}>Contactame</Text>
             </Pressable>
           </View>
+          <Pressable style={[styles.secondaryButton, styles.fullWidthButton]} onPress={() => startTutorial()}>
+            <RotateCcw color={theme.colors.primaryDark} size={18} />
+            <Text style={styles.secondaryButtonText}>Ver tutorial</Text>
+          </Pressable>
         </View>
 
         {renderAdminPanel()}
@@ -2940,7 +3135,7 @@ export default function App() {
   function renderFirstProfileSetup() {
     return (
       <SafeAreaView style={styles.safe}>
-        <StatusBar style="light" />
+        <AppStatusBar />
         <KeyboardAvoidingView style={styles.keyboardScreen} behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <ScrollView
             style={styles.content}
@@ -2951,7 +3146,7 @@ export default function App() {
             showsVerticalScrollIndicator={false}
           >
             <Image source={MEDIMIND_LOGO} style={styles.firstProfileLogo} resizeMode="contain" />
-            <Text style={styles.profileTitle}>Crea tu primer perfil</Text>
+            <Text style={[styles.profileTitle, styles.centeredTitle]}>Crea tu primer perfil</Text>
             <Text style={styles.firstProfileText}>Este perfil nos ayuda a organizar recetas, inventario y recordatorios desde el primer tratamiento.</Text>
             <View style={styles.firstProfileCard}>
               {renderProfileFormFields()}
@@ -2995,8 +3190,8 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar style="light" />
-      <View style={styles.appShell}>
+      <AppStatusBar />
+      <KeyboardAvoidingView style={styles.appShell} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         {tab !== "profile" ? (
           <View style={styles.topBar}>
             <ProfileSwitcher profiles={profiles} selectedProfileId={selectedProfileId} onSelect={setSelectedProfileId} onAdd={() => openProfileModal()} />
@@ -3006,44 +3201,48 @@ export default function App() {
           </View>
         ) : null}
 
-        <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} showsVerticalScrollIndicator={false}>
-          {renderCurrentTab()}
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentInner}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View
+            style={{
+              opacity: screenTransition,
+              transform: [
+                {
+                  translateY: screenTransition.interpolate({ inputRange: [0, 1], outputRange: [10, 0] })
+                }
+              ]
+            }}
+          >
+            {renderCurrentTab()}
+          </Animated.View>
         </ScrollView>
 
         <BottomNav current={tab} onChange={setTab} onNewRecipe={openRecipeWizard} />
-      </View>
+      </KeyboardAvoidingView>
 
-      <ModalShell visible={tutorialModalOpen} title="Bienvenido a MediMind" onClose={finishTutorial}>
-        <View style={styles.modalStack}>
-          {[
-            ["Perfil", "Primero creas el perfil de la persona que llevara el tratamiento."],
-            ["Receta", "Agrega una receta, registra los medicamentos y activa los recordatorios."],
-            ["Hoy", "En Hoy veras la siguiente dosis y el estado de las proximas tomas."],
-            ["Inventario e historial", "Revisa lo que queda y consulta lo completado, pospuesto u omitido."]
-          ].map(([title, text], index) => (
-            <View key={title} style={styles.tutorialRow}>
-              <View style={styles.tutorialNumber}>
-                <Text style={styles.tutorialNumberText}>{index + 1}</Text>
-              </View>
-              <View style={styles.flex}>
-                <Text style={styles.cardTitle}>{title}</Text>
-                <Text style={styles.muted}>{text}</Text>
-              </View>
-            </View>
-          ))}
-          <Pressable style={styles.primaryButton} onPress={finishTutorial}>
-            <Text style={styles.primaryButtonText}>Entendido</Text>
-          </Pressable>
-        </View>
-      </ModalShell>
+      <TutorialOverlay
+        visible={tutorialModalOpen}
+        step={currentTutorialStep}
+        index={tutorialStepIndex}
+        total={tutorialSteps.length}
+        onNext={advanceTutorial}
+        onClose={finishTutorial}
+      />
 
       <ModalShell visible={recipeModalOpen} title="Nueva receta" onClose={() => setRecipeModalOpen(false)}>
         <RecipeWizardSteps current={recipeStep} onSelect={goToRecipeStep} />
         {recipeStep === "photo" ? (
           <View style={styles.modalStack}>
             <FormSectionTitle title="Tratamiento" />
-            <FloatingInput label="Nombre del tratamiento o diagnostico" value={recipeTitle} onChangeText={setRecipeTitle} />
-            <DoctorInput prefix={recipeDoctorPrefix} name={recipeDoctor} onPrefixChange={setRecipeDoctorPrefix} onNameChange={setRecipeDoctor} />
+            <FloatingInput label="Nombre del tratamiento o diagnostico" value={recipeTitle} onChangeText={setRecipeTitle} error={visibleRecipeErrors.title} />
+            {visibleRecipeErrors.title ? <Text style={styles.inlineErrorText}>Agrega el nombre del tratamiento o diagnostico.</Text> : null}
+            <DoctorInput prefix={recipeDoctorPrefix} name={recipeDoctor} onPrefixChange={setRecipeDoctorPrefix} onNameChange={setRecipeDoctor} nameError={visibleRecipeErrors.doctor} />
             <View style={styles.reviewNotice}>
               <Camera color={theme.colors.primaryDark} size={20} />
               <Text style={[styles.reviewText, styles.centeredNoticeText]}>La fotografia solo es una referencia y es opcional. Puedes avanzar sin foto y registrar el medicamento manualmente.</Text>
@@ -3099,7 +3298,7 @@ export default function App() {
               </View>
             ) : null}
             <MedicationTabs drafts={wizardDrafts} activeIndex={activeWizardIndex} onSelect={setActiveWizardIndex} />
-            {!currentWizardDraft.confirmed ? <MedicationDraftForm draft={currentWizardDraft} onChange={updateWizardDraft} /> : (
+            {!currentWizardDraft.confirmed ? <MedicationDraftForm draft={currentWizardDraft} onChange={updateWizardDraft} errors={visibleMedicationErrors} /> : (
               <View style={styles.summaryRow}>
                 <Check color={theme.colors.primaryDark} size={20} />
                 <View style={styles.flex}>
@@ -3315,6 +3514,9 @@ export default function App() {
           </Pressable>
         </View>
       </ModalShell>
+
+      <NoticeModal notice={notice} onClose={() => setNotice(null)} />
+      <ChoiceModal choice={choiceModal} onClose={() => setChoiceModal(null)} />
 
       <ModalShell visible={Boolean(confirmation)} title={confirmation?.title ?? ""} onClose={() => setConfirmation(null)}>
         <View style={styles.modalStack}>
@@ -3623,6 +3825,122 @@ function EmptyState({ text }: { text: string }) {
   );
 }
 
+function AppStatusBar() {
+  return <NativeStatusBar barStyle="light-content" backgroundColor={theme.colors.background} translucent={false} />;
+}
+
+function NoticeModal({ notice, onClose }: { notice: NoticeState | null; onClose: () => void }) {
+  if (!notice) {
+    return null;
+  }
+
+  const toneColor =
+    notice.tone === "success" ? theme.colors.primary : notice.tone === "warning" ? theme.colors.apricot : notice.tone === "danger" ? theme.colors.rose : theme.colors.blue;
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.noticeOverlay} onPress={onClose}>
+        <Pressable style={styles.noticeCard} onPress={(event) => event.stopPropagation()}>
+          <View style={[styles.noticeIcon, { backgroundColor: toneColor }]}>
+            <BadgeInfo color={theme.colors.white} size={22} />
+          </View>
+          <Text style={styles.noticeTitle}>{notice.title}</Text>
+          <Text style={styles.noticeMessage}>{notice.message}</Text>
+          <Pressable style={styles.primaryButton} onPress={onClose}>
+            <Text style={styles.primaryButtonText}>Entendido</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function ChoiceModal({ choice, onClose }: { choice: ChoiceState | null; onClose: () => void }) {
+  if (!choice) {
+    return null;
+  }
+
+  function closeChoice() {
+    choice?.onClose?.();
+    onClose();
+  }
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={closeChoice}>
+      <Pressable style={styles.noticeOverlay} onPress={closeChoice}>
+        <Pressable style={styles.noticeCard} onPress={(event) => event.stopPropagation()}>
+          <View style={[styles.noticeIcon, { backgroundColor: theme.colors.primary }]}>
+            <Clock3 color={theme.colors.white} size={22} />
+          </View>
+          <Text style={styles.noticeTitle}>{choice.title}</Text>
+          <Text style={styles.noticeMessage}>{choice.message}</Text>
+          <View style={styles.choiceActions}>
+            {choice.actions.map((action) => (
+              <Pressable
+                key={action.label}
+                style={[
+                  styles.choiceButton,
+                  action.tone === "danger" && styles.choiceButtonDanger,
+                  action.tone === "secondary" && styles.choiceButtonSecondary
+                ]}
+                onPress={action.onPress}
+              >
+                <Text style={[styles.primaryButtonText, action.tone === "secondary" && styles.choiceButtonSecondaryText]}>{action.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function TutorialOverlay({
+  visible,
+  step,
+  index,
+  total,
+  onNext,
+  onClose
+}: {
+  visible: boolean;
+  step: TutorialStep;
+  index: number;
+  total: number;
+  onNext: () => void;
+  onClose: () => void;
+}) {
+  if (!visible) {
+    return null;
+  }
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.tutorialOverlay}>
+        <View style={styles.tutorialSpotlight}>
+          <Text style={styles.tutorialSpotlightText}>{step.target}</Text>
+        </View>
+        <View style={styles.tutorialArrow} />
+        <View style={styles.tutorialCard}>
+          <Text style={styles.tutorialProgress}>
+            Paso {index + 1} de {total}
+          </Text>
+          <Text style={styles.tutorialTitle}>{step.title}</Text>
+          <Text style={styles.tutorialMessage}>{step.message}</Text>
+          <View style={styles.tutorialActions}>
+            <Pressable style={styles.secondaryButton} onPress={onClose}>
+              <Text style={styles.secondaryButtonText}>Cerrar tutorial</Text>
+            </Pressable>
+            <Pressable style={styles.primaryButtonSmall} onPress={onNext}>
+              <Text style={styles.primaryButtonText}>{step.final ? "Finalizar" : "Entendido"}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function SourceBadge({ source }: { source: Recipe["source"] }) {
   const label = source === "scan" ? "Detectada" : source === "photo" ? "Foto" : "Manual";
   return (
@@ -3658,7 +3976,8 @@ function FloatingInput({
   onChangeText,
   keyboardType,
   secureTextEntry = false,
-  multiline = false
+  multiline = false,
+  error = false
 }: {
   label: string;
   value: string;
@@ -3666,6 +3985,7 @@ function FloatingInput({
   keyboardType?: React.ComponentProps<typeof TextInput>["keyboardType"];
   secureTextEntry?: boolean;
   multiline?: boolean;
+  error?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
   const active = focused || value.length > 0;
@@ -3681,12 +4001,16 @@ function FloatingInput({
   }, [active, labelProgress]);
 
   return (
-    <Pressable style={[styles.floatingInputContainer, multiline && styles.floatingInputContainerMultiline]} onPress={() => inputRef.current?.focus()}>
+    <Pressable style={[styles.floatingInputContainer, multiline && styles.floatingInputContainerMultiline, error && styles.inputError]} onPress={() => inputRef.current?.focus()}>
       <Animated.Text
         pointerEvents="none"
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.78}
         style={[
           styles.floatingInputLabel,
           active && styles.floatingInputLabelActive,
+          error && styles.floatingInputLabelError,
           {
             top: labelProgress.interpolate({ inputRange: [0, 1], outputRange: [17, 7] }),
             fontSize: labelProgress.interpolate({ inputRange: [0, 1], outputRange: [13, 11] })
@@ -3702,7 +4026,10 @@ function FloatingInput({
         keyboardType={keyboardType}
         secureTextEntry={secureTextEntry}
         multiline={multiline}
-        onFocus={() => setFocused(true)}
+        onFocus={() => {
+          closeOpenDropdowns();
+          setFocused(true);
+        }}
         onBlur={() => setFocused(false)}
         style={[styles.floatingInput, multiline && styles.floatingInputMultiline]}
       />
@@ -3723,14 +4050,25 @@ function FormSectionTitle({ title }: { title: string }) {
   return <Text style={styles.formSectionTitle}>{title.toUpperCase()}</Text>;
 }
 
-function UnitSelector({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+function UnitSelector({ value, onChange, error = false }: { value: string; onChange: (value: string) => void; error?: boolean }) {
   const [unitOpen, setUnitOpen] = useState(false);
 
+  useEffect(() => registerDropdownCloser(() => setUnitOpen(false)), []);
+
   return (
-    <View style={styles.dropdownField}>
-      <Text style={styles.dropdownFieldLabel}>Unidad</Text>
-      <Pressable style={styles.dropdownButton} onPress={() => setUnitOpen((open) => !open)}>
-        <Text style={styles.dropdownText}>{value ? unitLabelText(value) : "Selecciona unidad"}</Text>
+    <View style={[styles.dropdownField, unitOpen && styles.dropdownFieldOpen]}>
+      <Pressable
+        style={[styles.dropdownButton, error && styles.inputError]}
+        onPress={() => {
+          if (unitOpen) {
+            setUnitOpen(false);
+          } else {
+            closeOpenDropdowns();
+            setUnitOpen(true);
+          }
+        }}
+      >
+        <Text style={[styles.dropdownText, !value && styles.dropdownPlaceholderText]}>{value ? unitLabelText(value) : "Unidad"}</Text>
       </Pressable>
       {unitOpen ? (
         <View style={styles.dropdownPanel}>
@@ -3759,42 +4097,59 @@ function DoctorInput({
   prefix,
   name,
   onPrefixChange,
-  onNameChange
+  onNameChange,
+  nameError = false
 }: {
   prefix: DoctorPrefix;
   name: string;
   onPrefixChange: (value: DoctorPrefix) => void;
   onNameChange: (value: string) => void;
+  nameError?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => registerDropdownCloser(() => setOpen(false)), []);
 
   return (
-    <View style={[styles.formRow, styles.formRowRaised]}>
-      <View style={styles.doctorPrefixField}>
-        <Text style={styles.dropdownFieldLabel}>Titulo</Text>
-        <Pressable style={styles.dropdownButton} onPress={() => setOpen((current) => !current)}>
-          <Text style={styles.dropdownText}>{prefix}</Text>
-        </Pressable>
-        {open ? (
-          <View style={styles.dropdownPanel}>
-            {doctorPrefixOptions.map((option) => (
-              <Pressable
-                key={option}
-                style={[styles.dropdownOption, option === prefix && styles.dropdownOptionActive]}
-                onPress={() => {
-                  onPrefixChange(option);
-                  setOpen(false);
-                }}
-              >
-                <Text style={[styles.dropdownOptionText, option === prefix && styles.dropdownOptionTextActive]}>{option}</Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
+    <View style={styles.doctorInputBlock}>
+      <View style={[styles.formRow, styles.formRowRaised]}>
+        <View style={styles.doctorPrefixField}>
+          <Pressable
+            style={styles.dropdownButton}
+            onPress={() => {
+              if (open) {
+                setOpen(false);
+              } else {
+                closeOpenDropdowns();
+                setOpen(true);
+              }
+            }}
+          >
+            <Text style={styles.dropdownText}>{prefix}</Text>
+          </Pressable>
+          {open ? (
+            <View style={styles.dropdownPanel}>
+              <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={styles.dropdownScroll}>
+                {doctorPrefixOptions.map((option) => (
+                  <Pressable
+                    key={option}
+                    style={[styles.dropdownOption, option === prefix && styles.dropdownOptionActive]}
+                    onPress={() => {
+                      onPrefixChange(option);
+                      setOpen(false);
+                    }}
+                  >
+                    <Text style={[styles.dropdownOptionText, option === prefix && styles.dropdownOptionTextActive]}>{option}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          ) : null}
+        </View>
+        <View style={styles.formMainField}>
+          <FloatingInput label="Nombre del doctor" value={name} onChangeText={onNameChange} error={nameError} />
+        </View>
       </View>
-      <View style={styles.formMainField}>
-        <FloatingInput label="Nombre del doctor" value={name} onChangeText={onNameChange} />
-      </View>
+      {nameError ? <Text style={styles.inlineErrorText}>Agrega el nombre del doctor.</Text> : null}
     </View>
   );
 }
@@ -3802,19 +4157,32 @@ function DoctorInput({
 function AgeDropdown({
   value,
   options,
-  onSelect
+  onSelect,
+  placeholder = "Selecciona"
 }: {
   value: string;
   options: string[];
   onSelect: (value: string) => void;
+  placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
   const panelHeight = Math.min(options.length * 42 + 16, 188);
+  useEffect(() => registerDropdownCloser(() => setOpen(false)), []);
 
   return (
-    <View style={[styles.ageDropdown, open && { minHeight: 66 + panelHeight, zIndex: 80, elevation: 16 }]}>
-      <Pressable style={styles.dropdownButton} onPress={() => setOpen((current) => !current)}>
-        <Text style={styles.dropdownText}>{value || "Selecciona"}</Text>
+    <View style={[styles.ageDropdown, open && styles.ageDropdownOpen]}>
+      <Pressable
+        style={styles.dropdownButton}
+        onPress={() => {
+          if (open) {
+            setOpen(false);
+          } else {
+            closeOpenDropdowns();
+            setOpen(true);
+          }
+        }}
+      >
+        <Text style={[styles.dropdownText, !value && styles.dropdownPlaceholderText]}>{value || placeholder}</Text>
       </Pressable>
       {open ? (
         <View style={[styles.ageDropdownPanel, { height: panelHeight }]}>
@@ -3879,10 +4247,12 @@ function TimeSelector({ value, onChange }: { value: string; onChange: (value: st
     <Field label="Hora de inicio (opcional)">
       <View style={[styles.formRow, styles.ageSelectorRow]}>
         <View style={styles.formSideField}>
-          <AgeDropdown value={hour} options={hourOptions} onSelect={(nextHour) => updateTime(nextHour, minute)} />
+          <Text style={styles.timePartLabel}>Hora</Text>
+          <AgeDropdown value={hour} options={hourOptions} placeholder="Hora" onSelect={(nextHour) => updateTime(nextHour, minute)} />
         </View>
         <View style={styles.formSideField}>
-          <AgeDropdown value={minute} options={minuteOptions} onSelect={(nextMinute) => updateTime(hour, nextMinute)} />
+          <Text style={styles.timePartLabel}>Minutos</Text>
+          <AgeDropdown value={minute} options={minuteOptions} placeholder="Min" onSelect={(nextMinute) => updateTime(hour, nextMinute)} />
         </View>
       </View>
       <Text style={styles.timeSelectorHint}>Si la dejas vacia, se usara la hora actual al activar el tratamiento.</Text>
@@ -3892,11 +4262,22 @@ function TimeSelector({ value, onChange }: { value: string; onChange: (value: st
 
 function ColorSelector({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => registerDropdownCloser(() => setOpen(false)), []);
 
   return (
-    <View style={styles.profileColorOption}>
+    <View style={[styles.profileColorOption, open && styles.profileColorOptionOpen]}>
       <Text style={styles.profileColorTitle}>Color del perfil</Text>
-      <Pressable style={styles.colorDropdownButton} onPress={() => setOpen((current) => !current)}>
+      <Pressable
+        style={styles.colorDropdownButton}
+        onPress={() => {
+          if (open) {
+            setOpen(false);
+          } else {
+            closeOpenDropdowns();
+            setOpen(true);
+          }
+        }}
+      >
         <View style={[styles.colorPreviewDot, { backgroundColor: value }]} />
       </Pressable>
       {open ? (
@@ -3919,7 +4300,15 @@ function ColorSelector({ value, onChange }: { value: string; onChange: (value: s
   );
 }
 
-function MedicationDraftForm({ draft, onChange }: { draft: NewMedicationDraft; onChange: (draft: NewMedicationDraft) => void }) {
+function MedicationDraftForm({
+  draft,
+  onChange,
+  errors
+}: {
+  draft: NewMedicationDraft;
+  onChange: (draft: NewMedicationDraft) => void;
+  errors?: MedicationDraftErrorState;
+}) {
   const customFrequency = draft.frequencyMinutes > 0 && !frequencyPresets.some((option) => option.minutes === draft.frequencyMinutes);
   const [customValue, setCustomValue] = useState(customFrequency ? `${draft.frequencyMinutes < 60 ? draft.frequencyMinutes : draft.frequencyMinutes / 60}` : "2");
   const [customUnit, setCustomUnit] = useState<"minutes" | "hours">(draft.frequencyMinutes > 0 && draft.frequencyMinutes < 60 ? "minutes" : "hours");
@@ -3945,15 +4334,15 @@ function MedicationDraftForm({ draft, onChange }: { draft: NewMedicationDraft; o
   return (
     <View style={styles.formStack}>
       <FormSectionTitle title="Medicamento" />
-      <FloatingInput label="Nombre del medicamento" value={draft.name} onChangeText={(value) => onChange({ ...draft, name: value })} />
+      <FloatingInput label="Nombre del medicamento" value={draft.name} onChangeText={(value) => onChange({ ...draft, name: value })} error={Boolean(errors?.name)} />
+      {errors?.name ? <Text style={styles.inlineErrorText}>Agrega el nombre del medicamento.</Text> : null}
 
       <FormSectionTitle title="Tratamiento" />
-      <View style={styles.formSideField}>
-        <UnitSelector value={draft.unitLabel} onChange={(value) => onChange({ ...draft, unitLabel: value })} />
-      </View>
-
-      <View style={styles.formRow}>
-        <View style={styles.formSideField}>
+      <View style={[styles.formRow, styles.formRowRaised]}>
+        <View style={styles.formThirdField}>
+          <UnitSelector value={draft.unitLabel} onChange={(value) => onChange({ ...draft, unitLabel: value })} error={Boolean(errors?.unitLabel)} />
+        </View>
+        <View style={styles.formThirdField}>
           <FloatingInput
             label="Dosis"
             value={draft.dose}
@@ -3962,12 +4351,14 @@ function MedicationDraftForm({ draft, onChange }: { draft: NewMedicationDraft; o
               onChange({ ...draft, dose: nextDose, unitsPerDose: Number(nextDose) || 0 });
             }}
             keyboardType="numeric"
+            error={Boolean(errors?.dose)}
           />
         </View>
-        <View style={styles.formSideField}>
-          <FloatingInput label="Por cuantos dias" value={numberInputValue(draft.durationDays)} onChangeText={(value) => onChange({ ...draft, durationDays: Number(sanitizeNumericInput(value)) || 0 })} keyboardType="numeric" />
+        <View style={styles.formThirdField}>
+          <FloatingInput label="Por cuantos dias" value={numberInputValue(draft.durationDays)} onChangeText={(value) => onChange({ ...draft, durationDays: Number(sanitizeNumericInput(value)) || 0 })} keyboardType="numeric" error={Boolean(errors?.durationDays)} />
         </View>
       </View>
+      {errors?.unitLabel || errors?.dose || errors?.durationDays ? <Text style={styles.inlineErrorText}>Completa unidad, dosis y dias del tratamiento.</Text> : null}
 
       <Field label="Cada cuanto">
         <View style={styles.frequencyGrid}>
@@ -3984,6 +4375,7 @@ function MedicationDraftForm({ draft, onChange }: { draft: NewMedicationDraft; o
           </Pressable>
         </View>
       </Field>
+      {errors?.frequencyMinutes ? <Text style={styles.inlineErrorText}>Selecciona cada cuanto se toma.</Text> : null}
 
       {customFrequency ? (
         <View style={styles.formRow}>
@@ -4030,12 +4422,13 @@ function MedicationDraftForm({ draft, onChange }: { draft: NewMedicationDraft; o
       <FormSectionTitle title="Cuanto medicamento tienes" />
       <View style={styles.formRow}>
         <View style={styles.formSideField}>
-          <FloatingInput label="Frascos/cajas" value={numberInputValue(draft.containerCount)} onChangeText={(value) => onChange({ ...draft, containerCount: Number(sanitizeNumericInput(value)) || 0 })} keyboardType="numeric" />
+          <FloatingInput label="Frascos/cajas" value={numberInputValue(draft.containerCount)} onChangeText={(value) => onChange({ ...draft, containerCount: Number(sanitizeNumericInput(value)) || 0 })} keyboardType="numeric" error={Boolean(errors?.containerCount)} />
         </View>
         <View style={styles.formMainField}>
-          <FloatingInput label={totalUnitsLabel(draft.unitLabel)} value={numberInputValue(draft.unitsPerContainer)} onChangeText={(value) => onChange({ ...draft, unitsPerContainer: Number(sanitizeNumericInput(value)) || 0 })} keyboardType="numeric" />
+          <FloatingInput label={totalUnitsLabel(draft.unitLabel)} value={numberInputValue(draft.unitsPerContainer)} onChangeText={(value) => onChange({ ...draft, unitsPerContainer: Number(sanitizeNumericInput(value)) || 0 })} keyboardType="numeric" error={Boolean(errors?.unitsPerContainer)} />
         </View>
       </View>
+      {errors?.containerCount || errors?.unitsPerContainer ? <Text style={styles.inlineErrorText}>Completa cuantos frascos o cajas tienes y el total por frasco/caja.</Text> : null}
     </View>
   );
 }
@@ -4121,6 +4514,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 18,
     padding: 18,
+    paddingTop: SCREEN_TOP_GAP + 12,
     paddingBottom: 28
   },
   authBrand: {
@@ -4242,6 +4636,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    paddingTop: SCREEN_TOP_GAP,
     paddingRight: 14,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.08)",
@@ -4249,14 +4644,13 @@ const styles = StyleSheet.create({
   },
   switcher: {
     flex: 1,
-    paddingTop: Platform.OS === "android" ? 32 : 8,
+    paddingTop: 0,
     paddingBottom: 10,
     backgroundColor: theme.colors.background
   },
   topProfileButton: {
     width: 44,
     height: 44,
-    marginTop: Platform.OS === "android" ? 24 : 0,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 22,
@@ -4309,14 +4703,14 @@ const styles = StyleSheet.create({
     flex: 1
   },
   contentInner: {
-    paddingBottom: 24
+    paddingBottom: 132
   },
   screen: {
     padding: 18,
     gap: 16
   },
   profileScreen: {
-    paddingTop: Platform.OS === "android" ? 30 : 20
+    paddingTop: SCREEN_TOP_GAP
   },
   keyboardScreen: {
     flex: 1
@@ -4326,7 +4720,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 16,
     padding: 18,
-    paddingTop: Platform.OS === "android" ? 34 : 22,
+    paddingTop: SCREEN_TOP_GAP + 18,
     paddingBottom: 36
   },
   firstProfileLogo: {
@@ -4374,6 +4768,9 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: theme.colors.mint,
     letterSpacing: 0
+  },
+  centeredTitle: {
+    textAlign: "center"
   },
   roundButton: {
     width: 50,
@@ -5125,13 +5522,53 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     padding: 18,
-    paddingBottom: 140
+    paddingBottom: 140,
+    overflow: "visible"
   },
   modalStack: {
-    gap: 14
+    gap: 14,
+    overflow: "visible"
   },
   contactFormStack: {
     gap: 18
+  },
+  noticeOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+    backgroundColor: "rgba(8, 12, 11, 0.68)"
+  },
+  noticeCard: {
+    width: "100%",
+    maxWidth: 420,
+    alignItems: "center",
+    gap: 12,
+    padding: 20,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.line
+  },
+  noticeIcon: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 24
+  },
+  noticeTitle: {
+    color: theme.colors.ink,
+    fontSize: 20,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  noticeMessage: {
+    color: theme.colors.primaryDark,
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: "700",
+    textAlign: "center"
   },
   tutorialRow: {
     minHeight: 72,
@@ -5155,10 +5592,104 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textAlign: "center"
   },
+  choiceActions: {
+    width: "100%",
+    gap: 10
+  },
+  choiceButton: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.primary
+  },
+  choiceButtonSecondary: {
+    backgroundColor: theme.colors.mint
+  },
+  choiceButtonDanger: {
+    backgroundColor: theme.colors.rose
+  },
+  choiceButtonSecondaryText: {
+    color: theme.colors.primaryDark
+  },
+  tutorialOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    gap: 12,
+    padding: 20,
+    paddingTop: SCREEN_TOP_GAP + 20,
+    backgroundColor: "rgba(8, 12, 11, 0.76)"
+  },
+  tutorialSpotlight: {
+    alignSelf: "center",
+    maxWidth: 320,
+    minHeight: 54,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+    borderRadius: theme.radius.pill,
+    backgroundColor: "rgba(217,237,223,0.18)",
+    borderWidth: 2,
+    borderColor: theme.colors.mint
+  },
+  tutorialSpotlightText: {
+    color: theme.colors.white,
+    fontSize: 15,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  tutorialArrow: {
+    alignSelf: "center",
+    width: 0,
+    height: 0,
+    borderLeftWidth: 12,
+    borderRightWidth: 12,
+    borderBottomWidth: 16,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderBottomColor: theme.colors.surface
+  },
+  tutorialCard: {
+    width: "100%",
+    maxWidth: 520,
+    alignSelf: "center",
+    gap: 10,
+    padding: 18,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.line
+  },
+  tutorialProgress: {
+    color: theme.colors.primaryDark,
+    fontSize: 12,
+    fontWeight: "800",
+    textAlign: "center",
+    textTransform: "uppercase"
+  },
+  tutorialTitle: {
+    color: theme.colors.ink,
+    fontSize: 22,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  tutorialMessage: {
+    color: theme.colors.primaryDark,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: "700",
+    textAlign: "center"
+  },
+  tutorialActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4
+  },
   field: {
     flex: 1,
     gap: 7,
-    minWidth: 0
+    minWidth: 0,
+    overflow: "visible"
   },
   fieldLabel: {
     fontSize: 13,
@@ -5170,6 +5701,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "900",
     color: theme.colors.primaryDark
+  },
+  inlineErrorText: {
+    marginTop: -6,
+    color: theme.colors.rose,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "800"
+  },
+  inputError: {
+    borderColor: theme.colors.rose,
+    borderWidth: 2
+  },
+  floatingInputLabelError: {
+    color: theme.colors.rose
   },
   input: {
     minHeight: 46,
@@ -5377,7 +5922,8 @@ const styles = StyleSheet.create({
     color: theme.colors.white
   },
   formStack: {
-    gap: 14
+    gap: 14,
+    overflow: "visible"
   },
   formRow: {
     flexDirection: "row",
@@ -5395,9 +5941,20 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0
   },
+  formThirdField: {
+    flex: 1,
+    minWidth: 0
+  },
+  doctorInputBlock: {
+    gap: 7,
+    zIndex: 60,
+    elevation: 12,
+    overflow: "visible"
+  },
   doctorPrefixField: {
     width: 92,
-    zIndex: 25
+    zIndex: 65,
+    elevation: 12
   },
   frequencyGrid: {
     flexDirection: "row",
@@ -5551,7 +6108,12 @@ const styles = StyleSheet.create({
     width: "100%",
     minHeight: 56,
     position: "relative",
-    zIndex: 30
+    zIndex: 70,
+    elevation: 12
+  },
+  dropdownFieldOpen: {
+    zIndex: 140,
+    elevation: 24
   },
   dropdownFieldLabel: {
     position: "absolute",
@@ -5578,17 +6140,25 @@ const styles = StyleSheet.create({
     maxHeight: 18,
     overflow: "hidden"
   },
+  dropdownPlaceholderText: {
+    color: theme.colors.primaryDark,
+    fontWeight: "500"
+  },
   dropdownPanel: {
     position: "absolute",
     top: 66,
     left: 0,
     right: 0,
-    zIndex: 40,
-    elevation: 8,
+    zIndex: 160,
+    elevation: 24,
+    maxHeight: 300,
     gap: 8,
     padding: 10,
     borderRadius: theme.radius.sm,
     backgroundColor: "#f3eadb"
+  },
+  dropdownScroll: {
+    maxHeight: 260
   },
   dropdownOption: {
     minHeight: 36,
@@ -5609,7 +6179,9 @@ const styles = StyleSheet.create({
   },
   ageSelectorRow: {
     alignItems: "flex-start",
-    zIndex: 35
+    zIndex: 90,
+    elevation: 18,
+    overflow: "visible"
   },
   timeSelectorHint: {
     marginTop: 6,
@@ -5618,11 +6190,22 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontWeight: "600"
   },
+  timePartLabel: {
+    marginBottom: 6,
+    color: theme.colors.primaryDark,
+    fontSize: 12,
+    fontWeight: "800"
+  },
   ageDropdown: {
     width: "100%",
     minHeight: 56,
     position: "relative",
-    zIndex: 35
+    zIndex: 90,
+    elevation: 18
+  },
+  ageDropdownOpen: {
+    zIndex: 180,
+    elevation: 30
   },
   ageDropdownPanel: {
     position: "absolute",
@@ -5630,8 +6213,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     maxHeight: 180,
-    zIndex: 90,
-    elevation: 18,
+    zIndex: 200,
+    elevation: 30,
     padding: 8,
     borderRadius: theme.radius.sm,
     backgroundColor: "#f3eadb",
@@ -5818,6 +6401,10 @@ const styles = StyleSheet.create({
     zIndex: 25,
     overflow: "visible"
   },
+  profileColorOptionOpen: {
+    zIndex: 220,
+    elevation: 30
+  },
   profileColorTitle: {
     color: theme.colors.primaryDark,
     fontSize: 11,
@@ -5850,12 +6437,12 @@ const styles = StyleSheet.create({
   colorDropdownPanel: {
     position: "absolute",
     right: 0,
-    bottom: 84,
+    bottom: 74,
     minWidth: 178,
     flexDirection: "row",
     justifyContent: "center",
-    zIndex: 30,
-    elevation: 8,
+    zIndex: 240,
+    elevation: 30,
     gap: 7,
     padding: 8,
     borderRadius: theme.radius.pill,
