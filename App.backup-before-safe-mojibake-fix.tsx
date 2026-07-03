@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+﻿import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as Notifications from "expo-notifications";
@@ -202,22 +202,22 @@ const unitOptions = ["Tabletas", "Capsulas", "Mililitros", "Gotas", "Sobres", "D
 const doctorPrefixOptions: DoctorPrefix[] = [
   "Dr.",
   "Dra.",
-  "Médico",
-  "Médica",
+  "MÃ©dico",
+  "MÃ©dica",
   "Psic.",
-  "Psicólogo",
-  "Psicóloga",
+  "PsicÃ³logo",
+  "PsicÃ³loga",
   "Lic.",
   "Licda.",
   "Enfermero",
   "Enfermera",
-  "Nutriólogo",
-  "Nutrióloga",
-  "Odontólogo",
-  "Odontóloga",
+  "NutriÃ³logo",
+  "NutriÃ³loga",
+  "OdontÃ³logo",
+  "OdontÃ³loga",
   "Pediatra",
-  "Ginecólogo",
-  "Ginecóloga",
+  "GinecÃ³logo",
+  "GinecÃ³loga",
   "Otro"
 ];
 const STATUS_BAR_OFFSET = Platform.OS === "android" ? NativeStatusBar.currentHeight ?? 0 : 0;
@@ -339,7 +339,7 @@ function doseDateLabel(iso: string) {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   if (dateKey === todayDateKey(tomorrow)) {
-    return "Mañana";
+    return "MaÃ±ana";
   }
 
   return dateKey === today ? "" : formatShortDate(iso);
@@ -464,7 +464,7 @@ function formatProfileAge(amount: number, unit: AgeUnit) {
   if (unit === "months") {
     return `${amount} ${amount === 1 ? "mes" : "meses"}`;
   }
-  return `${amount} ${amount === 1 ? "año" : "años"}`;
+  return `${amount} ${amount === 1 ? "aÃ±o" : "aÃ±os"}`;
 }
 
 function profileAgeText(value: string) {
@@ -472,7 +472,7 @@ function profileAgeText(value: string) {
   if (!clean) {
     return "";
   }
-  return /^\d+$/.test(clean) ? `${clean} años` : clean;
+  return /^\d+$/.test(clean) ? `${clean} aÃ±os` : clean;
 }
 
 function normalizedText(value: string) {
@@ -746,13 +746,13 @@ async function attachNotificationsToEvents(events: DoseEvent[], sourceMedication
 
 function inferUnitFromText(text: string) {
   const normalized = text.toLowerCase();
-  if (/(capsula|capsulas|c[aá]psula|c[aá]psulas)/i.test(normalized)) {
+  if (/(capsula|capsulas|c[aÃ¡]psula|c[aÃ¡]psulas)/i.test(normalized)) {
     return "Capsulas";
   }
   if (/(tableta|tabletas|comprimido|comprimidos|pastilla|pastillas)/i.test(normalized)) {
     return "Tabletas";
   }
-  if (/(mililitro|mililitros|\bml\b|jarabe|suspensi[oó]n)/i.test(normalized)) {
+  if (/(mililitro|mililitros|\bml\b|jarabe|suspensi[oÃ³]n)/i.test(normalized)) {
     return "Mililitros";
   }
   if (/(gota|gotas)/i.test(normalized)) {
@@ -779,7 +779,7 @@ function parseFrequencyMinutes(text: string) {
 }
 
 function parseDurationDays(text: string) {
-  const durationMatch = text.match(/(?:por|durante)\s*(\d+(?:[.,]\d+)?)\s*(d[ií]as?|dias?)/i);
+  const durationMatch = text.match(/(?:por|durante)\s*(\d+(?:[.,]\d+)?)\s*(d[iÃ­]as?|dias?)/i);
   return durationMatch ? Math.round(Number(durationMatch[1].replace(",", "."))) : 0;
 }
 
@@ -787,10 +787,10 @@ function parseDoseFromText(text: string, unitLabel: string) {
   const unitPattern = unitLabel
     ? unitLabel
         .toLowerCase()
-        .replace("capsulas", "c[aá]psulas?")
+        .replace("capsulas", "c[aÃ¡]psulas?")
         .replace("tabletas", "tabletas?")
         .replace("mililitros", "mililitros?|ml")
-    : "tabletas?|c[aá]psulas?|mililitros?|ml|gotas?|sobres?|dosis";
+    : "tabletas?|c[aÃ¡]psulas?|mililitros?|ml|gotas?|sobres?|dosis";
   const takeMatch = text.match(/(?:tomar|toma|dosis)\s*(\d+(?:[.,]\d+)?)/i);
   const unitMatch = text.match(new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*(?:${unitPattern})`, "i"));
   const value = takeMatch?.[1] ?? unitMatch?.[1] ?? "";
@@ -798,7 +798,7 @@ function parseDoseFromText(text: string, unitLabel: string) {
 }
 
 function parseInstructionsFromText(text: string) {
-  const instructionMatch = text.match(/(despu[eé]s de [^.,;\n]+|antes de [^.,;\n]+|con alimentos?[^.,;\n]*|en ayunas[^.,;\n]*|si hay [^.,;\n]+)/i);
+  const instructionMatch = text.match(/(despu[eÃ©]s de [^.,;\n]+|antes de [^.,;\n]+|con alimentos?[^.,;\n]*|en ayunas[^.,;\n]*|si hay [^.,;\n]+)/i);
   return instructionMatch ? sentenceCase(instructionMatch[1]) : "";
 }
 
@@ -807,11 +807,11 @@ function cleanMedicationName(segment: string) {
   const clean = firstLine
     .replace(/^(rx|receta|medicamento|medicamentos?)\s*:?\s*/i, "")
     .replace(/\b\d+(?:[.,]\d+)?\s*(mg|g|mcg|ml|%)\b/gi, "")
-    .replace(/\b(tabletas?|c[aá]psulas?|capsulas?|comprimidos?|pastillas?|mililitros?|gotas?|sobres?|dosis)\b/gi, "")
+    .replace(/\b(tabletas?|c[aÃ¡]psulas?|capsulas?|comprimidos?|pastillas?|mililitros?|gotas?|sobres?|dosis)\b/gi, "")
     .replace(/\s+/g, " ")
     .trim();
 
-  if (/^(agotamiento|cansancio|diagn[oó]stico|diagnostico|tratamiento|dolor|fiebre|tos|garganta|control)(\s|$)/i.test(clean)) {
+  if (/^(agotamiento|cansancio|diagn[oÃ³]stico|diagnostico|tratamiento|dolor|fiebre|tos|garganta|control)(\s|$)/i.test(clean)) {
     return "";
   }
 
@@ -820,11 +820,11 @@ function cleanMedicationName(segment: string) {
 
 function buildDraftsFromScannedText(lines: string[]) {
   const cleanLines = lines.map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
-  const ignoredLine = /(paciente|fecha|edad|firma|c[eé]dula|cedula|diagn[oó]stico|doctor|doctora|\bdr\b|\bdra\b)/i;
-  const medicationSignal = /(\d+\s*(mg|g|mcg|ml)\b|tabletas?|c[aá]psulas?|capsulas?|gotas?|sobres?|jarabe|suspensi[oó]n|tomar|toma|cada|c\/)/i;
+  const ignoredLine = /(paciente|fecha|edad|firma|c[eÃ©]dula|cedula|diagn[oÃ³]stico|doctor|doctora|\bdr\b|\bdra\b)/i;
+  const medicationSignal = /(\d+\s*(mg|g|mcg|ml)\b|tabletas?|c[aÃ¡]psulas?|capsulas?|gotas?|sobres?|jarabe|suspensi[oÃ³]n|tomar|toma|cada|c\/)/i;
   const starts = cleanLines
     .map((line, index) => ({ line, index, nextLine: cleanLines[index + 1] ?? "" }))
-    .filter(({ line, nextLine }) => /[a-záéíóúñ]{4,}/i.test(line) && !ignoredLine.test(line) && (medicationSignal.test(line) || medicationSignal.test(nextLine)))
+    .filter(({ line, nextLine }) => /[a-zÃ¡Ã©Ã­Ã³ÃºÃ±]{4,}/i.test(line) && !ignoredLine.test(line) && (medicationSignal.test(line) || medicationSignal.test(nextLine)))
     .map(({ index }) => index);
   const uniqueStarts = starts.filter((index, position) => position === 0 || index - starts[position - 1] > 1).slice(0, 4);
 
@@ -849,13 +849,13 @@ function buildDraftsFromScannedText(lines: string[]) {
     })
     .filter((draft) => draft.name.trim().length > 0 || draft.dose || draft.unitLabel);
 
-  const titleLine = cleanLines.find((line) => /diagn[oó]stico|tratamiento/i.test(line));
-  const doctorLine = cleanLines.find((line) => /\b(dr|dra|doctor|doctora|medico|m[eé]dico)\b/i.test(line));
+  const titleLine = cleanLines.find((line) => /diagn[oÃ³]stico|tratamiento/i.test(line));
+  const doctorLine = cleanLines.find((line) => /\b(dr|dra|doctor|doctora|medico|m[eÃ©]dico)\b/i.test(line));
 
   return {
     drafts,
-    title: titleLine?.replace(/diagn[oó]stico|tratamiento|:/gi, "").trim(),
-    doctor: doctorLine?.replace(/doctor|doctora|medico|m[eé]dico|dr\.?|dra\.?|:/gi, "").trim(),
+    title: titleLine?.replace(/diagn[oÃ³]stico|tratamiento|:/gi, "").trim(),
+    doctor: doctorLine?.replace(/doctor|doctora|medico|m[eÃ©]dico|dr\.?|dra\.?|:/gi, "").trim(),
     preview: cleanLines.slice(0, 8).join("\n")
   };
 }
@@ -1798,7 +1798,7 @@ export default function App() {
     return new Promise((resolve) => {
       setChoiceModal({
         title: "Hora de inicio pasada",
-        message: `Por la hora de inicio, ya hay ${count} dosis que debieron tomarse. ¿Quieres marcarlas como completadas?`,
+        message: `Por la hora de inicio, ya hay ${count} dosis que debieron tomarse. Â¿Quieres marcarlas como completadas?`,
         onClose: () => resolve("cancel"),
         actions: [
           {
@@ -2511,7 +2511,7 @@ export default function App() {
 
             {!isRecover ? (
               <Pressable style={styles.authLinkButton} onPress={() => resetAuthForm("recover")}>
-                <Text style={styles.authInlineText}>¿Olvidaste tu contraseña? <Text style={styles.authInlineLink}>Recuperala</Text></Text>
+                <Text style={styles.authInlineText}>Â¿Olvidaste tu contraseÃ±a? <Text style={styles.authInlineLink}>Recuperala</Text></Text>
               </Pressable>
             ) : (
               <Pressable style={styles.authLinkButton} onPress={() => resetAuthForm("login")}>
@@ -2536,7 +2536,7 @@ export default function App() {
             {!isRecover ? (
               <Pressable style={styles.authLinkButton} onPress={() => resetAuthForm(isSignup ? "login" : "signup")}>
                 <Text style={styles.authInlineText}>
-                  {isSignup ? "¿Ya tienes cuenta? " : "¿No tienes cuenta? "}
+                  {isSignup ? "Â¿Ya tienes cuenta? " : "Â¿No tienes cuenta? "}
                   <Text style={styles.authInlineLink}>{isSignup ? "Inicia sesion" : "Crea una"}</Text>
                 </Text>
               </Pressable>
@@ -4128,7 +4128,7 @@ function DoctorInput({
           </Pressable>
           {open ? (
             <View style={styles.dropdownPanel}>
-              <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator persistentScrollbar style={styles.dropdownScroll}>
+              <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={styles.dropdownScroll}>
                 {doctorPrefixOptions.map((option) => (
                   <Pressable
                     key={option}
@@ -4186,7 +4186,7 @@ function AgeDropdown({
       </Pressable>
       {open ? (
         <View style={[styles.ageDropdownPanel, { height: panelHeight }]}>
-          <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator persistentScrollbar style={styles.dropdownScroll}>
+          <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}>
             {options.map((option) => (
               <Pressable
                 key={option}
@@ -4209,7 +4209,7 @@ function AgeDropdown({
 function AgeSelector({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const parsed = parseProfileAge(value);
   const amount = parsed.amount > 0 ? `${parsed.amount}` : "";
-  const unitLabel = parsed.unit === "months" ? "Meses" : "Años";
+  const unitLabel = parsed.unit === "months" ? "Meses" : "AÃ±os";
   const amountOptions = Array.from({ length: parsed.unit === "months" ? 24 : 120 }, (_, index) => `${index + 1}`);
 
   function updateAge(nextAmountText = amount, nextUnitLabel = unitLabel) {
@@ -4225,7 +4225,7 @@ function AgeSelector({ value, onChange }: { value: string; onChange: (value: str
           <AgeDropdown value={amount} options={amountOptions} onSelect={(nextAmount) => updateAge(nextAmount, unitLabel)} />
         </View>
         <View style={styles.formSideField}>
-          <AgeDropdown value={unitLabel} options={["Años", "Meses"]} onSelect={(nextUnit) => updateAge(amount || "1", nextUnit)} />
+          <AgeDropdown value={unitLabel} options={["AÃ±os", "Meses"]} onSelect={(nextUnit) => updateAge(amount || "1", nextUnit)} />
         </View>
       </View>
     </Field>
