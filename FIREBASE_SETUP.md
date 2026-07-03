@@ -29,12 +29,71 @@ En Firebase Console > Authentication > Sign-in method:
 
 - Email/Password
 - Google
-- Facebook
-- Phone, cuando quieras activar celular real
+- Facebook, con App ID y App Secret de Meta Developers
+- Phone, cuando quieras activar SMS real
 
-## 4. Estado actual
+Para cerrar V1, primero deja funcionando Email/Password y Firestore. Google, Facebook y SMS real requieren configuracion adicional externa.
+
+## 4. Activar base de datos
+
+En Firebase Console > Firestore Database:
+
+1. Crea la base en modo produccion.
+2. Crea reglas para que solo el usuario autenticado escriba su propio documento.
+3. La app escribira:
+   - `users/{uid}` con datos basicos de la cuenta.
+   - `usageSnapshots/{uid}` con conteos anonimos de perfiles, tratamientos y dosis.
+
+Reglas sugeridas:
+
+```txt
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.email == "kingghidorahx12@gmail.com";
+    }
+
+    match /users/{userId} {
+      allow create, update: if isOwner(userId);
+      allow read: if isOwner(userId) || isAdmin();
+    }
+
+    match /usageSnapshots/{userId} {
+      allow create, update: if isOwner(userId);
+      allow read: if isOwner(userId) || isAdmin();
+    }
+  }
+}
+```
+
+## 5. Android y Google/Facebook nativo
+
+Para que Google/Facebook funcionen dentro de la APK final hace falta:
+
+1. Registrar app Android en Firebase con package `com.medimind.app`.
+2. Agregar SHA-1/SHA-256 de la build de Expo/EAS.
+3. Configurar Google provider con el cliente Android.
+4. Configurar Facebook provider con App ID/App Secret desde Meta Developers.
+5. Agregar el flujo OAuth nativo con paquetes de Expo antes de publicar esa funcion.
+
+## 6. Celular con SMS real
+
+El flujo visual ya existe: numero, enviar codigo y validar codigo. Para SMS real hace falta activar Phone Auth en Firebase y conectar el verificador nativo. Mientras eso no este, el codigo es de prueba local.
+
+## 7. Estado actual
 
 - Correo y contrasena ya usan Firebase cuando `firebaseConfig` esta completo.
-- Google y Facebook usan Firebase en Web; para app nativa falta configurar OAuth nativo.
-- Celular queda como prueba local hasta activar Phone Auth con verificacion SMS.
-- Sin configuracion Firebase, MediMind sigue funcionando con sesion local de prueba.
+- Google y Facebook usan Firebase en Web; para app nativa faltan los Client ID nativos y el flujo OAuth de Expo.
+- Celular ya tiene el flujo correcto de enviar codigo y verificarlo, pero el SMS real requiere activar Phone Auth.
+- Sin configuracion Firebase, MediMind sigue funcionando con correo/celular local para pruebas.
+- Los botones sociales ya no crean sesiones falsas si Firebase no esta conectado.
