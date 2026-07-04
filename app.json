@@ -1,4 +1,4 @@
-﻿{
+{
   "expo": {
     "name": "Kura",
     "slug": "kura",
@@ -10,7 +10,7 @@
     "version": "1.0.2",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "icon": "./assets/medimind-logo-generated.png",
+    "icon": "./assets/kura-icon.png",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -28,7 +28,7 @@
       "versionCode": 3,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/medimind-logo-generated.png",
+        "foregroundImage": "./assets/kura-icon.png",
         "backgroundColor": "#17211f"
       },
       "permissions": [
@@ -67,4 +67,3 @@
     }
   }
 }
-
