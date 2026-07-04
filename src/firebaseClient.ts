@@ -1,4 +1,4 @@
-import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
+﻿import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
   FacebookAuthProvider,
@@ -6,12 +6,13 @@ import {
   GoogleAuthProvider,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithCredential,
   signInWithPopup,
   signOut,
   updateProfile,
   type User
 } from "firebase/auth";
-import { collection, doc, getCountFromServer, getFirestore, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, getCountFromServer, getDocs, getFirestore, serverTimestamp, setDoc } from "firebase/firestore";
 import { firebaseConfig, hasFirebaseConfig } from "./firebaseConfig";
 
 export type FirebaseAuthProviderName = "email" | "phone" | "google" | "facebook";
@@ -39,6 +40,14 @@ export type FirebaseUsageSnapshotInput = {
 export type FirebaseAdminStats = {
   userCount: number;
   usageSnapshotCount: number;
+  activeUserCount: number;
+  profileCount: number;
+  recipeCount: number;
+  medicationCount: number;
+  doseEventCount: number;
+  completedDoseCount: number;
+  skippedDoseCount: number;
+  latestSyncAt: string | null;
 };
 
 function getFirebaseApp(): FirebaseApp | null {
@@ -77,10 +86,30 @@ function profileFromFirebaseUser(user: User, fallbackProvider: FirebaseAuthProvi
   const provider = providerFromFirebaseUser(user, fallbackProvider);
   return {
     id: user.uid,
-    name: user.displayName || "Usuario MediMind",
+    name: user.displayName || "Usuario Kura",
     identifier: user.email || user.phoneNumber || `${provider}@firebase`,
     provider
   };
+}
+
+function numberFromSnapshotField(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function firestoreDateToIso(value: unknown) {
+  if (!value) {
+    return null;
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (typeof value === "object" && "toDate" in value && typeof value.toDate === "function") {
+    return value.toDate().toISOString();
+  }
+  if (typeof value === "object" && "seconds" in value && typeof value.seconds === "number") {
+    return new Date(value.seconds * 1000).toISOString();
+  }
+  return typeof value === "string" ? value : null;
 }
 
 export async function syncFirebaseUserRecord(user: FirebaseUserRecordInput) {
@@ -129,14 +158,53 @@ export async function getFirebaseAdminStats(): Promise<FirebaseAdminStats | null
     return null;
   }
 
-  const [users, usageSnapshots] = await Promise.all([
+  const [users, usageSnapshots, usageSnapshotDocs] = await Promise.all([
     getCountFromServer(collection(db, "users")),
-    getCountFromServer(collection(db, "usageSnapshots"))
+    getCountFromServer(collection(db, "usageSnapshots")),
+    getDocs(collection(db, "usageSnapshots"))
   ]);
+
+  const totals = {
+    activeUserCount: 0,
+    profileCount: 0,
+    recipeCount: 0,
+    medicationCount: 0,
+    doseEventCount: 0,
+    completedDoseCount: 0,
+    skippedDoseCount: 0,
+    latestSyncAt: null as string | null
+  };
+
+  usageSnapshotDocs.forEach((snapshot) => {
+    const data = snapshot.data();
+    const profileCount = numberFromSnapshotField(data.profileCount);
+    const recipeCount = numberFromSnapshotField(data.recipeCount);
+    const medicationCount = numberFromSnapshotField(data.medicationCount);
+    const doseEventCount = numberFromSnapshotField(data.doseEventCount);
+    const completedDoseCount = numberFromSnapshotField(data.completedDoseCount);
+    const skippedDoseCount = numberFromSnapshotField(data.skippedDoseCount);
+
+    totals.profileCount += profileCount;
+    totals.recipeCount += recipeCount;
+    totals.medicationCount += medicationCount;
+    totals.doseEventCount += doseEventCount;
+    totals.completedDoseCount += completedDoseCount;
+    totals.skippedDoseCount += skippedDoseCount;
+
+    if (profileCount > 0 || recipeCount > 0 || medicationCount > 0 || doseEventCount > 0) {
+      totals.activeUserCount += 1;
+    }
+
+    const updatedAt = firestoreDateToIso(data.updatedAt);
+    if (updatedAt && (!totals.latestSyncAt || new Date(updatedAt).getTime() > new Date(totals.latestSyncAt).getTime())) {
+      totals.latestSyncAt = updatedAt;
+    }
+  });
 
   return {
     userCount: users.data().count,
-    usageSnapshotCount: usageSnapshots.data().count
+    usageSnapshotCount: usageSnapshots.data().count,
+    ...totals
   };
 }
 
@@ -184,6 +252,28 @@ export async function signInWithFirebaseSocial(providerName: "google" | "faceboo
   return profileFromFirebaseUser(result.user, providerName);
 }
 
+export async function signInWithFirebaseGoogleIdToken(idToken: string) {
+  const auth = getFirebaseAuth();
+  if (!auth) {
+    return null;
+  }
+
+  const credential = GoogleAuthProvider.credential(idToken);
+  const result = await signInWithCredential(auth, credential);
+  return profileFromFirebaseUser(result.user, "google");
+}
+
+export async function signInWithFirebaseFacebookAccessToken(accessToken: string) {
+  const auth = getFirebaseAuth();
+  if (!auth) {
+    return null;
+  }
+
+  const credential = FacebookAuthProvider.credential(accessToken);
+  const result = await signInWithCredential(auth, credential);
+  return profileFromFirebaseUser(result.user, "facebook");
+}
+
 export async function signOutFromFirebase() {
   const auth = getFirebaseAuth();
   if (!auth) {
@@ -194,3 +284,4 @@ export async function signOutFromFirebase() {
 }
 
 export { hasFirebaseConfig };
+

@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+﻿import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as Notifications from "expo-notifications";
@@ -14,7 +14,10 @@ import {
   Check,
   Clock3,
   Droplets,
+  Eye,
+  EyeOff,
   FileText,
+  Fingerprint,
   GlassWater,
   Home,
   HeartHandshake,
@@ -41,7 +44,9 @@ import {
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
+  AppState,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -59,6 +64,8 @@ import Svg, { Circle, Path } from "react-native-svg";
 import { buildDoseEvents, formatFrequency, formatShortDate, formatTime, getStockLevel, getStockPercent, suggestTimes, todayDateKey } from "./src/schedule";
 import { theme } from "./src/theme";
 import { DoseEvent, DoseStatus, Medication, NewMedicationDraft, Profile, ProfileIcon, Recipe, TabKey } from "./src/types";
+import { KuraLogo } from "./src/KuraLogo";
+import { confirmNativePhoneVerification, formatPhoneForFirebase, sendNativePhoneVerification, type NativePhoneConfirmation } from "./src/nativePhoneAuth";
 import {
   createFirebaseEmailUser,
   getFirebaseAdminStats,
@@ -66,12 +73,15 @@ import {
   saveFirebaseUsageSnapshot,
   sendFirebasePasswordReset,
   signInWithFirebaseEmail,
+  signInWithFirebaseFacebookAccessToken,
+  signInWithFirebaseGoogleIdToken,
   signInWithFirebaseSocial,
   signOutFromFirebase,
   syncFirebaseUserRecord,
   type FirebaseAdminStats,
   type FirebaseAuthProfile
 } from "./src/firebaseClient";
+import { requestFacebookAccessToken, requestGoogleIdToken } from "./src/nativeSocialAuth";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -115,6 +125,9 @@ type AuthUser = {
 };
 type LocalUserRecord = AuthUser & {
   secret?: string;
+};
+type DeviceAuthAccount = AuthUser & {
+  lastUsedAt: string;
 };
 type PhoneCodeState = {
   identifier: string;
@@ -178,19 +191,20 @@ function closeOpenDropdowns() {
   dropdownClosers.forEach((close) => close());
 }
 
-const APP_NAME = "MediMind";
+const APP_NAME = "Kura";
 const MEDIMIND_LOGO = require("./assets/medimind-logo-generated.png");
 const STORAGE_KEY_PREFIX = "medimind-state-v1";
 const AUTH_STORAGE_KEY = "medimind-auth-v1";
+const DEVICE_ACCOUNTS_STORAGE_KEY = "medimind-device-accounts-v1";
 const USERS_STORAGE_KEY = "medimind-users-v1";
-const APP_VERSION = "1.0.0";
-const DEVELOPER_GITHUB = "KingGhidoraX12";
-const PAYPAL_DONATION_URL = "https://paypal.me/NexarPerez";
+const APP_VERSION = "1.0.1";
+const DEVELOPER_GITHUB = "KingGhidorahX12";
+const PAYPAL_DONATION_URL = "https://paypal.me/KingGhidorahX12";
 const MERCADO_PAGO_DONATION_URL = "";
 const DONATION_URL = MERCADO_PAGO_DONATION_URL || PAYPAL_DONATION_URL;
 const CONTACT_EMAIL = "kingghidorahx12@gmail.com";
 const CONTACT_WHATSAPP = "527121709077";
-const ADMIN_IDENTIFIERS = [CONTACT_EMAIL, "kingghidorahx12", "kingghidorax12"];
+const ADMIN_IDENTIFIERS = [CONTACT_EMAIL, "KingGhidorahX12", "kingghidorahx12@gmail.com"];
 const MEDICATION_CHANNEL_ID = "medimind-medication-reminders";
 const MEDICATION_CATEGORY_ID = "medimind_medication_actions";
 const NOTIFICATION_ACTION_TAKEN = "MEDIMIND_TAKEN";
@@ -202,22 +216,18 @@ const unitOptions = ["Tabletas", "Capsulas", "Mililitros", "Gotas", "Sobres", "D
 const doctorPrefixOptions: DoctorPrefix[] = [
   "Dr.",
   "Dra.",
-  "Médico",
-  "Médica",
+  "Med.",
   "Psic.",
-  "Psicólogo",
-  "Psicóloga",
   "Lic.",
   "Licda.",
-  "Enfermero",
-  "Enfermera",
-  "Nutriólogo",
-  "Nutrióloga",
-  "Odontólogo",
-  "Odontóloga",
-  "Pediatra",
-  "Ginecólogo",
-  "Ginecóloga",
+  "Enf.",
+  "Nut.",
+  "Odont.",
+  "Ped.",
+  "Gin.",
+  "Q.F.B.",
+  "Mtro.",
+  "Mtra.",
   "Otro"
 ];
 const STATUS_BAR_OFFSET = Platform.OS === "android" ? NativeStatusBar.currentHeight ?? 0 : 0;
@@ -233,13 +243,13 @@ const frequencyPresets = [
 const tutorialSteps: TutorialStep[] = [
   {
     tab: "profile",
-    target: "Boton Agregar perfil",
+    target: "Botón Agregar perfil",
     title: "Primero crea un perfil",
-    message: "Crea el perfil de la persona que usara MediMind. Asi cada receta, inventario e historial queda separado."
+    message: "Crea el perfil de la persona que usará Kura. Así cada receta, inventario e historial queda separado."
   },
   {
     tab: "recipes",
-    target: "Boton Agregar receta",
+    target: "Botón Agregar receta",
     title: "Registra una receta",
     message: "Agrega el tratamiento, sus medicamentos y los horarios. La foto puede quedarse solo como referencia."
   },
@@ -247,13 +257,13 @@ const tutorialSteps: TutorialStep[] = [
     tab: "today",
     target: "Siguiente dosis",
     title: "Revisa lo que toca ahora",
-    message: "Aqui aparece la dosis mas cercana. Desde ahi puedes marcarla como completada, posponerla u omitirla."
+    message: "Aquí aparece la dosis más cercana. Desde ahí puedes marcarla como completada, posponerla u omitirla."
   },
   {
     tab: "today",
     target: "Siguientes dosis",
     title: "Mira lo que viene",
-    message: "Esta seccion muestra la dosis actual y las proximas tomas para que no pierdas el ritmo del tratamiento."
+    message: "Esta sección muestra la dosis actual y las próximas tomas para que no pierdas el ritmo del tratamiento."
   },
   {
     tab: "inventory",
@@ -269,9 +279,9 @@ const tutorialSteps: TutorialStep[] = [
   },
   {
     tab: "profile",
-    target: "Boton Donar",
-    title: "Gracias por usar MediMind",
-    message: "Si la app te ayuda, puedes apoyar el proyecto con un cafe desde el boton Donar cuando este configurado.",
+    target: "Botón Donar",
+    title: "Gracias por usar Kura",
+    message: "Si la app te ayuda, puedes apoyar el proyecto con un café desde el botón Donar cuando está configurado.",
     final: true
   }
 ];
@@ -284,8 +294,8 @@ const tabs: Array<{ key: TabKey; label: string; icon: IconType }> = [
 ];
 
 const profileIconOptions: Array<{ value: ProfileIcon; label: string; icon: IconType; gender: string }> = [
-  { value: "baby", label: "Bebe", icon: Baby, gender: "Bebe" },
-  { value: "child", label: "Nino", icon: PersonStanding, gender: "Nino" },
+  { value: "baby", label: "Bebé", icon: Baby, gender: "Bebé" },
+  { value: "child", label: "Niño", icon: PersonStanding, gender: "Niño" },
   { value: "teen", label: "Adolescente", icon: UserRound, gender: "Adolescente" },
   { value: "adult", label: "Adulto", icon: UserRound, gender: "Adulto" },
   { value: "older", label: "Adulto mayor", icon: Accessibility, gender: "Adulto mayor" }
@@ -565,7 +575,7 @@ function previewTimes(draft: NewMedicationDraft) {
   if (times.length <= 6) {
     return times.join(", ");
   }
-  return `${times.slice(0, 6).join(", ")} y ${times.length - 6} mas`;
+  return `${times.slice(0, 6).join(", ")} y ${times.length - 6} más`;
 }
 
 function getUnitIcon(unitLabel: string): IconType {
@@ -644,7 +654,7 @@ async function prepareNotificationActions() {
       }
     ]);
   } catch {
-    // Algunas vistas web o builds de prueba no exponen categorias de notificacion.
+    // Algunas vistas web o builds de prueba no exponen categorías de notificación.
   }
 }
 
@@ -704,7 +714,7 @@ async function sendActionFeedbackNotification(title: string, body: string) {
       trigger: null
     });
   } catch {
-    // Si el sistema no permite avisos inmediatos, la accion ya quedo registrada en la app.
+    // Si el sistema no permite avisos inmediatos, la acción ya quedó registrada en la app.
   }
 }
 
@@ -779,18 +789,20 @@ function parseFrequencyMinutes(text: string) {
 }
 
 function parseDurationDays(text: string) {
-  const durationMatch = text.match(/(?:por|durante)\s*(\d+(?:[.,]\d+)?)\s*(d[ií]as?|dias?)/i);
+  const durationMatch = text.match(/(?:por|durante)\s*(\d+(?:[.,]\d+)?)\s*(d[ií]as?)/i);
   return durationMatch ? Math.round(Number(durationMatch[1].replace(",", "."))) : 0;
 }
 
 function parseDoseFromText(text: string, unitLabel: string) {
-  const unitPattern = unitLabel
-    ? unitLabel
-        .toLowerCase()
-        .replace("capsulas", "c[aá]psulas?")
-        .replace("tabletas", "tabletas?")
-        .replace("mililitros", "mililitros?|ml")
-    : "tabletas?|c[aá]psulas?|mililitros?|ml|gotas?|sobres?|dosis";
+  const unitPatterns: Record<string, string> = {
+    capsulas: "c[aá]psulas?|capsulas?",
+    tabletas: "tabletas?|comprimidos?|pastillas?",
+    mililitros: "mililitros?|ml",
+    gotas: "gotas?",
+    sobres: "sobres?",
+    dosis: "dosis"
+  };
+  const unitPattern = unitLabel ? unitPatterns[unitLabel.toLowerCase()] ?? unitLabel.toLowerCase() : Object.values(unitPatterns).join("|");
   const takeMatch = text.match(/(?:tomar|toma|dosis)\s*(\d+(?:[.,]\d+)?)/i);
   const unitMatch = text.match(new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*(?:${unitPattern})`, "i"));
   const value = takeMatch?.[1] ?? unitMatch?.[1] ?? "";
@@ -807,7 +819,7 @@ function cleanMedicationName(segment: string) {
   const clean = firstLine
     .replace(/^(rx|receta|medicamento|medicamentos?)\s*:?\s*/i, "")
     .replace(/\b\d+(?:[.,]\d+)?\s*(mg|g|mcg|ml|%)\b/gi, "")
-    .replace(/\b(tabletas?|c[aá]psulas?|capsulas?|comprimidos?|pastillas?|mililitros?|gotas?|sobres?|dosis)\b/gi, "")
+    .replace(/\b(tabletas?|c[aá]psulas?|capsulas?|comprimidos?|pastillas?|mililitros?|ml|gotas?|sobres?|dosis)\b/gi, "")
     .replace(/\s+/g, " ")
     .trim();
 
@@ -860,6 +872,28 @@ function buildDraftsFromScannedText(lines: string[]) {
   };
 }
 
+function upsertDeviceAccount(accounts: DeviceAuthAccount[], user: AuthUser) {
+  const nextAccount: DeviceAuthAccount = { ...user, lastUsedAt: new Date().toISOString() };
+  const remaining = accounts.filter((account) => account.id !== user.id);
+  return [nextAccount, ...remaining].sort((a, b) => new Date(b.lastUsedAt).getTime() - new Date(a.lastUsedAt).getTime());
+}
+
+async function canUseBiometricUnlock() {
+  if (Platform.OS === "web") {
+    return false;
+  }
+
+  try {
+    const [hasHardware, enrolled] = await Promise.all([
+      LocalAuthentication.hasHardwareAsync(),
+      LocalAuthentication.isEnrolledAsync()
+    ]);
+    return hasHardware && enrolled;
+  } catch {
+    return false;
+  }
+}
+
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [authHydrated, setAuthHydrated] = useState(false);
@@ -874,8 +908,17 @@ export default function App() {
   const [authSecret, setAuthSecret] = useState("");
   const [authNotice, setAuthNotice] = useState("");
   const [localUsers, setLocalUsers] = useState<LocalUserRecord[]>([]);
+  const [deviceAccounts, setDeviceAccounts] = useState<DeviceAuthAccount[]>([]);
+  const [selectedDeviceAccountId, setSelectedDeviceAccountId] = useState("");
+  const [useManualAuthForm, setUseManualAuthForm] = useState(false);
   const [phoneCodeState, setPhoneCodeState] = useState<PhoneCodeState | null>(null);
+  const nativePhoneConfirmationRef = useRef<NativePhoneConfirmation | null>(null);
+  const lastActivityAtRef = useRef(Date.now());
+  const lockingSessionRef = useRef(false);
   const [remoteAdminStats, setRemoteAdminStats] = useState<FirebaseAdminStats | null>(null);
+  const [adminStatsLoading, setAdminStatsLoading] = useState(false);
+  const [adminStatsError, setAdminStatsError] = useState("");
+  const [adminStatsSyncedAt, setAdminStatsSyncedAt] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>("today");
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -956,12 +999,36 @@ export default function App() {
   useEffect(() => {
     async function loadAuthState() {
       try {
-        const [saved, savedUsers] = await Promise.all([AsyncStorage.getItem(AUTH_STORAGE_KEY), AsyncStorage.getItem(USERS_STORAGE_KEY)]);
+        const [saved, savedUsers, savedDeviceAccounts] = await Promise.all([
+          AsyncStorage.getItem(AUTH_STORAGE_KEY),
+          AsyncStorage.getItem(USERS_STORAGE_KEY),
+          AsyncStorage.getItem(DEVICE_ACCOUNTS_STORAGE_KEY)
+        ]);
         if (savedUsers) {
           setLocalUsers(JSON.parse(savedUsers) as LocalUserRecord[]);
         }
+        const parsedDeviceAccounts = savedDeviceAccounts ? (JSON.parse(savedDeviceAccounts) as DeviceAuthAccount[]) : [];
+        let nextDeviceAccounts = parsedDeviceAccounts;
         if (saved) {
-          setAuthUser(JSON.parse(saved) as AuthUser);
+          const parsedUser = JSON.parse(saved) as AuthUser;
+          nextDeviceAccounts = upsertDeviceAccount(parsedDeviceAccounts, parsedUser);
+          setDeviceAccounts(nextDeviceAccounts);
+          setSelectedDeviceAccountId(parsedUser.id);
+          setStoredAuthUser(parsedUser);
+          setUseManualAuthForm(false);
+          const canUnlockWithBiometrics = await canUseBiometricUnlock();
+          if (canUnlockWithBiometrics) {
+            setBiometricAvailable(true);
+            setAuthNotice("Confirma tu huella o biometría para entrar a tu sesión guardada.");
+          } else {
+            setAuthUser(parsedUser);
+          }
+          await AsyncStorage.setItem(DEVICE_ACCOUNTS_STORAGE_KEY, JSON.stringify(nextDeviceAccounts));
+        } else {
+          setDeviceAccounts(nextDeviceAccounts);
+          setSelectedDeviceAccountId(nextDeviceAccounts[0]?.id ?? "");
+          setStoredAuthUser(nextDeviceAccounts[0] ?? null);
+          setBiometricAvailable(nextDeviceAccounts.length > 0 ? await canUseBiometricUnlock() : false);
         }
       } finally {
         setAuthHydrated(true);
@@ -1039,6 +1106,34 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!authUser) {
+      lastActivityAtRef.current = Date.now();
+      return;
+    }
+
+    lastActivityAtRef.current = Date.now();
+    const interval = setInterval(() => {
+      if (Date.now() - lastActivityAtRef.current >= 15 * 60 * 1000) {
+        void lockSessionForInactivity();
+      }
+    }, 30000);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        if (Date.now() - lastActivityAtRef.current >= 15 * 60 * 1000) {
+          void lockSessionForInactivity();
+        } else {
+          markActivity();
+        }
+      }
+    });
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [authUser?.id]);
+
+  useEffect(() => {
     screenTransition.setValue(0);
     Animated.timing(screenTransition, {
       toValue: 1,
@@ -1083,7 +1178,7 @@ export default function App() {
 
       if (response.actionIdentifier === NOTIFICATION_ACTION_TAKEN) {
         void updateDoseStatus(eventId, "taken").then(() => {
-          void sendActionFeedbackNotification("Dosis completada", "Bien hecho. MediMind actualizo tu tratamiento.");
+          void sendActionFeedbackNotification("Dosis completada", "Bien hecho. Kura actualizó tu tratamiento.");
           showNotice("Bien hecho", "Dosis marcada como completada.", "success");
         });
         return;
@@ -1098,9 +1193,9 @@ export default function App() {
       }
 
       if (response.actionIdentifier === NOTIFICATION_ACTION_SKIP) {
-        void updateDoseStatus(eventId, "skipped", { skippedReason: "Omitida desde la notificacion" }).then(() => {
-          void sendActionFeedbackNotification("Dosis omitida", "Quedo registrada. Revisa el ritmo del tratamiento cuando puedas.");
-          showNotice("Dosis omitida", "Quedo registrada. Si puedes, revisa el ritmo del tratamiento.", "warning");
+        void updateDoseStatus(eventId, "skipped", { skippedReason: "Omitida desde la notificación" }).then(() => {
+          void sendActionFeedbackNotification("Dosis omitida", "Quedó registrada. Revisa el ritmo del tratamiento cuando puedas.");
+          showNotice("Dosis omitida", "Quedó registrada. Si puedes, revisa el ritmo del tratamiento.", "warning");
         });
         return;
       }
@@ -1114,28 +1209,17 @@ export default function App() {
   useEffect(() => {
     if (!hydrated || !isAdminAuthUser(authUser)) {
       setRemoteAdminStats(null);
+      setAdminStatsError("");
+      setAdminStatsSyncedAt(null);
       return;
     }
 
-    let active = true;
-    getFirebaseAdminStats()
-      .then((stats) => {
-        if (active) {
-          setRemoteAdminStats(stats);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setRemoteAdminStats(null);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
+    void refreshAdminStats(true);
   }, [authUser, hydrated, localUsers.length, profiles.length, recipes.length, medications.length, doseEvents.length]);
 
   const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId) ?? profiles[0];
+  const selectedDeviceAccount = deviceAccounts.find((account) => account.id === selectedDeviceAccountId) ?? storedAuthUser ?? deviceAccounts[0] ?? null;
+  const shouldShowSavedAccountLogin = authMode === "login" && !useManualAuthForm && Boolean(selectedDeviceAccount);
   const profileRecipes = recipes.filter((recipe) => recipe.profileId === selectedProfileId);
   const profileMedications = medications.filter((medication) => medication.profileId === selectedProfileId);
   const profileDoseEvents = doseEvents.filter((event) => event.profileId === selectedProfileId);
@@ -1252,13 +1336,13 @@ export default function App() {
       return undefined;
     }
     if (medicationEvents.length === 1) {
-      return "Primera y ultima dosis";
+      return "Primera y última dosis";
     }
     if (index === 0) {
       return "Primera dosis";
     }
     if (index === medicationEvents.length - 1) {
-      return "Ultima dosis";
+      return "Última dosis";
     }
     return undefined;
   }
@@ -1314,6 +1398,7 @@ export default function App() {
     setAuthSecret("");
     setAuthNotice("");
     setPhoneCodeState(null);
+    nativePhoneConfirmationRef.current = null;
   }
 
   function showNotice(title: string, message: string, tone: NoticeState["tone"] = "info") {
@@ -1323,6 +1408,18 @@ export default function App() {
   async function saveLocalUsers(nextUsers: LocalUserRecord[]) {
     setLocalUsers(nextUsers);
     await AsyncStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(nextUsers));
+  }
+
+  async function saveDeviceAccounts(nextAccounts: DeviceAuthAccount[]) {
+    setDeviceAccounts(nextAccounts);
+    await AsyncStorage.setItem(DEVICE_ACCOUNTS_STORAGE_KEY, JSON.stringify(nextAccounts));
+  }
+
+  async function rememberDeviceAccount(user: AuthUser) {
+    const nextAccounts = upsertDeviceAccount(deviceAccounts, user);
+    setSelectedDeviceAccountId(user.id);
+    setStoredAuthUser(user);
+    await saveDeviceAccounts(nextAccounts);
   }
 
   function normalizedAuthIdentifier(value: string) {
@@ -1352,18 +1449,47 @@ export default function App() {
     return `${Math.floor(100000 + Math.random() * 900000)}`;
   }
 
-  function sendPhoneCode() {
+  async function sendPhoneCode() {
     const identifier = authIdentifier.trim();
     if (!identifier) {
-      showNotice("Falta el celular", "Escribe tu numero celular para enviar el codigo.", "warning");
+      showNotice("Falta el celular", "Escribe tu número celular para enviar el código.", "warning");
       return;
     }
     if (authMode === "login" && !findLocalUser("phone", identifier) && !hasFirebaseConfig()) {
-      setAuthNotice("No encontre una cuenta con ese celular. Primero crea una cuenta.");
+      setAuthNotice("No encontré una cuenta con ese celular. Primero crea una cuenta.");
       return;
     }
 
+    if (hasFirebaseConfig() && Platform.OS !== "web") {
+      const formattedPhone = formatPhoneForFirebase(identifier);
+      if (!formattedPhone || formattedPhone.length < 11) {
+        showNotice("Revisa el celular", "Escribe el número con 10 dígitos o con lada internacional.", "warning");
+        return;
+      }
+
+      try {
+        setAuthNotice("Enviando SMS real...");
+        const confirmation = await sendNativePhoneVerification(formattedPhone);
+        if (confirmation) {
+          nativePhoneConfirmationRef.current = confirmation;
+          setPhoneCodeState({
+            identifier,
+            code: "",
+            expiresAt: Date.now() + 10 * 60 * 1000
+          });
+          setAuthSecret("");
+          setAuthNotice(`Te enviamos un SMS real a ${formattedPhone}. Escribe el código para continuar.`);
+          return;
+        }
+      } catch (error) {
+        nativePhoneConfirmationRef.current = null;
+        showNotice("No se pudo enviar SMS", firebaseErrorMessage(error), "danger");
+        return;
+      }
+    }
+
     const code = makePhoneCode();
+    nativePhoneConfirmationRef.current = null;
     setPhoneCodeState({
       identifier,
       code,
@@ -1372,23 +1498,23 @@ export default function App() {
     setAuthSecret("");
     setAuthNotice(
       hasFirebaseConfig()
-        ? "Cuando activemos Phone Auth, aqui se enviara el SMS real. Por ahora usa el codigo de prueba."
-        : `Codigo de prueba: ${code}. En Firebase este codigo llegara por SMS.`
+        ? "En navegador seguimos usando código de prueba. En APK instalada se enviará SMS real."
+        : `Código de prueba: ${code}. En Firebase este código llegará por SMS.`
     );
   }
 
   function validatePhoneCode(identifier: string, secret: string) {
     if (!phoneCodeState || phoneCodeState.identifier !== identifier) {
-      showNotice("Envia el codigo", "Primero envia el codigo de verificacion al celular.", "warning");
+      showNotice("Envía el código", "Primero envía el código de verificación al celular.", "warning");
       return false;
     }
     if (Date.now() > phoneCodeState.expiresAt) {
       setPhoneCodeState(null);
-      setAuthNotice("El codigo vencio. Envia uno nuevo.");
+      setAuthNotice("El código venció. Envía uno nuevo.");
       return false;
     }
     if (!secret || secret !== phoneCodeState.code) {
-      showNotice("Codigo incorrecto", "Revisa el codigo e intentalo de nuevo.", "danger");
+      showNotice("Código incorrecto", "Revisa el código e inténtalo de nuevo.", "danger");
       return false;
     }
     return true;
@@ -1397,7 +1523,7 @@ export default function App() {
   function buildLocalAuthUser(provider: AuthUser["provider"], identifier: string, name?: string): AuthUser {
     return {
       id: makeId(`user-${provider}`),
-      name: name?.trim() || (provider === "email" || provider === "phone" ? "Usuario MediMind" : `Usuario ${provider === "google" ? "Google" : "Facebook"}`),
+      name: name?.trim() || (provider === "email" || provider === "phone" ? "Usuario Kura" : `Usuario ${provider === "google" ? "Google" : "Facebook"}`),
       identifier,
       provider,
       createdAt: new Date().toISOString()
@@ -1417,25 +1543,132 @@ export default function App() {
   function firebaseErrorMessage(error: unknown) {
     const message = error instanceof Error ? error.message : "";
     if (message.includes("auth/invalid-credential") || message.includes("auth/wrong-password")) {
-      return "Los datos de inicio de sesion no coinciden.";
+      return "Los datos de inicio de sesión no coinciden.";
     }
     if (message.includes("auth/email-already-in-use")) {
       return "Ese correo ya tiene una cuenta.";
     }
     if (message.includes("auth/weak-password")) {
-      return "Usa una contrasena de al menos 6 caracteres.";
+      return "Usa una contraseña de al menos 6 caracteres.";
     }
     if (message.includes("auth/popup")) {
-      return "No se pudo abrir la ventana de inicio de sesion.";
+      return "No se pudo abrir la ventana de inicio de sesión.";
     }
-    return "Firebase no pudo completar la operacion. Revisa la configuracion del proyecto.";
+    return "Firebase no pudo completar la operación. Revisa la configuración del proyecto.";
   }
 
   async function saveAuthUser(user: AuthUser) {
+    await rememberDeviceAccount(user);
     setAuthUser(user);
+    setStoredAuthUser(user);
+    setBiometricAvailable(false);
+    setBiometricChecking(false);
+    setUseManualAuthForm(false);
+    setAuthSecret("");
     setTab("today");
     await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
     void syncFirebaseUserRecord(user).catch(() => undefined);
+  }
+
+  async function refreshAdminStats(silent = false) {
+    if (!isAdminAuthUser(authUser)) {
+      return;
+    }
+
+    if (!hasFirebaseConfig()) {
+      setRemoteAdminStats(null);
+      setAdminStatsError("Firebase aún no está conectado.");
+      return;
+    }
+
+    if (!silent) {
+      setAdminStatsLoading(true);
+    }
+    setAdminStatsError("");
+
+    try {
+      const stats = await getFirebaseAdminStats();
+      setRemoteAdminStats(stats);
+      setAdminStatsSyncedAt(new Date().toISOString());
+      if (!stats) {
+        setAdminStatsError("No hay datos remotos todavía.");
+      }
+    } catch {
+      setRemoteAdminStats(null);
+      setAdminStatsError("No pude leer Firebase. Revisa reglas, conexión o permisos admin.");
+    } finally {
+      setAdminStatsLoading(false);
+    }
+  }
+
+  async function unlockWithBiometrics(account = selectedDeviceAccount) {
+    if (!account) {
+      showNotice("Sin sesión guardada", "Inicia sesión con tu correo o celular para activar el desbloqueo con huella en este dispositivo.", "warning");
+      return;
+    }
+
+    setBiometricChecking(true);
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: `Entrar a ${APP_NAME}`,
+        cancelLabel: "Cancelar",
+        fallbackLabel: "Usar contraseña"
+      });
+
+      if (result.success) {
+        await saveAuthUser(account);
+        setAuthNotice("");
+        resetAuthForm("login");
+        return;
+      }
+
+      setAuthNotice("No se desbloqueó la sesión. Puedes intentarlo otra vez o iniciar sesión manualmente.");
+    } catch {
+      showNotice("Biometría no disponible", "No pude usar la huella en este momento. Puedes entrar con correo o celular.", "warning");
+    } finally {
+      setBiometricChecking(false);
+    }
+  }
+
+  async function loginSavedAccountWithPassword() {
+    const account = selectedDeviceAccount;
+    const secret = authSecret.trim();
+
+    if (!account) {
+      setUseManualAuthForm(true);
+      return;
+    }
+    if (account.provider !== "email") {
+      showNotice("Usa otra opción", "Esta cuenta no usa contraseña. Entra con huella o elige otra cuenta.", "warning");
+      return;
+    }
+    if (!secret) {
+      showNotice("Falta la contraseña", "Escribe la contraseña de esta cuenta para entrar.", "warning");
+      return;
+    }
+
+    if (hasFirebaseConfig()) {
+      try {
+        const firebaseProfile = await signInWithFirebaseEmail(account.identifier, secret);
+        if (firebaseProfile) {
+          await saveAuthUser(buildAuthUserFromFirebase(firebaseProfile));
+          resetAuthForm("login");
+          return;
+        }
+      } catch (error) {
+        showNotice("No se pudo iniciar sesión", firebaseErrorMessage(error), "danger");
+        return;
+      }
+    }
+
+    const localUser = findLocalUser("email", account.identifier);
+    if (!localUser || (localUser.secret && localUser.secret !== secret)) {
+      showNotice("Datos incorrectos", "La contraseña no coincide con esa cuenta.", "danger");
+      return;
+    }
+
+    await saveAuthUser(localUser);
+    resetAuthForm("login");
   }
 
   async function handleAuthSubmit() {
@@ -1443,8 +1676,27 @@ export default function App() {
     const secret = authSecret.trim();
 
     if (!identifier) {
-      showNotice("Falta un dato", authMethod === "email" ? "Escribe tu correo." : "Escribe tu numero celular.", "warning");
+      showNotice("Falta un dato", authMethod === "email" ? "Escribe tu correo." : "Escribe tu número celular.", "warning");
       return;
+    }
+
+    if (authMethod === "phone" && nativePhoneConfirmationRef.current) {
+      if (!secret) {
+        showNotice("Falta el código", "Escribe el código que llegó por SMS.", "warning");
+        return;
+      }
+
+      try {
+        const firebaseProfile = await confirmNativePhoneVerification(nativePhoneConfirmationRef.current, secret, authName);
+        nativePhoneConfirmationRef.current = null;
+        setPhoneCodeState(null);
+        await saveAuthUser(buildAuthUserFromFirebase(firebaseProfile));
+        resetAuthForm("login");
+        return;
+      } catch (error) {
+        showNotice("Código incorrecto", firebaseErrorMessage(error), "danger");
+        return;
+      }
     }
 
     if (authMode === "recover") {
@@ -1467,7 +1719,7 @@ export default function App() {
       if (authMethod === "email" && hasFirebaseConfig()) {
         try {
           await sendFirebasePasswordReset(identifier);
-          setAuthNotice("Firebase envio las instrucciones para recuperar tu acceso.");
+          setAuthNotice("Firebase envió las instrucciones para recuperar tu acceso.");
         } catch (error) {
           setAuthNotice(firebaseErrorMessage(error));
         }
@@ -1478,8 +1730,8 @@ export default function App() {
       setAuthNotice(
         existing
           ? authMethod === "email"
-            ? "Cuenta encontrada. En Firebase se enviara un correo real para recuperar contrasena."
-            : "Cuenta encontrada. En Firebase se enviara un SMS real para recuperar acceso."
+            ? "Cuenta encontrada. En Firebase se enviará un correo real para recuperar contraseña."
+            : "Cuenta encontrada. En Firebase se enviará un SMS real para recuperar acceso."
           : "No encontre una cuenta con esos datos. Primero crea una cuenta."
       );
       return;
@@ -1495,7 +1747,7 @@ export default function App() {
         return;
       }
     } else if (!secret) {
-      showNotice("Falta la clave", "Escribe tu contrasena.", "warning");
+      showNotice("Falta la clave", "Escribe tu contraseña.", "warning");
       return;
     }
 
@@ -1511,7 +1763,7 @@ export default function App() {
           return;
         }
       } catch (error) {
-        showNotice("No se pudo iniciar sesion", firebaseErrorMessage(error), "danger");
+        showNotice("No se pudo iniciar sesión", firebaseErrorMessage(error), "danger");
         return;
       }
     }
@@ -1529,11 +1781,11 @@ export default function App() {
 
     const user = findLocalUser(authMethod, identifier);
     if (!user) {
-      showNotice("Cuenta no encontrada", "Primero crea una cuenta para poder iniciar sesion.", "warning");
+      showNotice("Cuenta no encontrada", "Primero crea una cuenta para poder iniciar sesión.", "warning");
       return;
     }
     if (authMethod === "email" && user.secret && user.secret !== secret) {
-      showNotice("Datos incorrectos", "La contrasena no coincide con esa cuenta.", "danger");
+      showNotice("Datos incorrectos", "La contraseña no coincide con esa cuenta.", "danger");
       return;
     }
     await saveAuthUser(user);
@@ -1555,18 +1807,77 @@ export default function App() {
           return;
         }
       } catch (error) {
-        showNotice("No se pudo iniciar sesion", firebaseErrorMessage(error), "danger");
+        showNotice("No se pudo iniciar sesión", firebaseErrorMessage(error), "danger");
         return;
       }
     }
 
-    showNotice("OAuth nativo pendiente", "Google y Facebook en la app instalada necesitan los Client ID nativos y el flujo OAuth de Expo antes de publicar V1.", "warning");
+    try {
+      const firebaseProfile =
+        provider === "google"
+          ? await signInWithFirebaseGoogleIdToken(await requestGoogleIdToken())
+          : await signInWithFirebaseFacebookAccessToken(await requestFacebookAccessToken());
+
+      if (firebaseProfile) {
+        await saveAuthUser(buildAuthUserFromFirebase(firebaseProfile));
+        setAuthNotice("");
+        resetAuthForm("login");
+        return;
+      }
+    } catch (error) {
+      showNotice("Falta configurar acceso", error instanceof Error ? error.message : firebaseErrorMessage(error), "warning");
+      return;
+    }
+
+    showNotice("No se pudo iniciar sesión", "Firebase no devolvió usuario para este proveedor.", "danger");
+  }
+
+  function markActivity() {
+    lastActivityAtRef.current = Date.now();
+  }
+
+  async function lockSessionForInactivity() {
+    if (!authUser || lockingSessionRef.current) {
+      return;
+    }
+
+    lockingSessionRef.current = true;
+    const currentUser = authUser;
+    try {
+      await signOutFromFirebase();
+      await rememberDeviceAccount(currentUser);
+      await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(currentUser));
+      setStoredAuthUser(currentUser);
+      setSelectedDeviceAccountId(currentUser.id);
+      setBiometricAvailable(await canUseBiometricUnlock());
+      setUseManualAuthForm(false);
+      setAuthUser(null);
+      setProfiles([]);
+      setRecipes([]);
+      setMedications([]);
+      setDoseEvents([]);
+      setSelectedProfileId("");
+      setTutorialSeen(false);
+      resetAuthForm("login");
+      setAuthNotice("Por seguridad bloqueamos la app después de 15 minutos sin actividad.");
+    } finally {
+      lockingSessionRef.current = false;
+    }
   }
 
   async function signOut() {
+    const currentUser = authUser;
     await signOutFromFirebase();
-    await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
+    if (currentUser) {
+      await rememberDeviceAccount(currentUser);
+      await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(currentUser));
+      setStoredAuthUser(currentUser);
+      setSelectedDeviceAccountId(currentUser.id);
+      setBiometricAvailable(await canUseBiometricUnlock());
+    }
     setAuthUser(null);
+    setBiometricChecking(false);
+    setUseManualAuthForm(false);
     setProfiles([]);
     setRecipes([]);
     setMedications([]);
@@ -1579,7 +1890,7 @@ export default function App() {
 
   function openRecipeWizard() {
     if (!selectedProfileId || profiles.length === 0) {
-      showNotice("Primero agrega un perfil", "Asi MediMind sabra para quien es la receta.", "warning");
+      showNotice("Primero agrega un perfil", "Así Kura sabrá para quién es la receta.", "warning");
       setTab("profile");
       openProfileModal();
       return;
@@ -1624,7 +1935,7 @@ export default function App() {
 
     requestConfirmation({
       title: "Revisa el escaneo",
-      message: "El escaneo esta en pruebas y puede cometer errores. MediMind llenara lo que detecte, pero revisa cada campo antes de activar las alarmas.",
+      message: "El escaneo está en pruebas y puede cometer errores. Kura llenará lo que detecte, pero revisa cada campo antes de activar las alarmas.",
       confirmLabel: "Escanear",
       onConfirm: () => void runRecipeScan()
     });
@@ -1798,7 +2109,7 @@ export default function App() {
     return new Promise((resolve) => {
       setChoiceModal({
         title: "Hora de inicio pasada",
-        message: `Por la hora de inicio, ya hay ${count} dosis que debieron tomarse. ¿Quieres marcarlas como completadas?`,
+        message: `Por la hora de inicio, ya hay ${count} dosis que debieron tomarse. ¿Quieres marcarlas como completadasí`,
         onClose: () => resolve("cancel"),
         actions: [
           {
@@ -1914,38 +2225,40 @@ export default function App() {
           }
         : medication;
     });
+
+    setRecipeModalOpen(false);
+    setTab("today");
+
     const scheduledEvents = await attachNotificationsToEvents(newEvents, adjustedMedications);
     setRecipes((current) => [recipe, ...current]);
     setMedications((current) => [...adjustedMedications, ...current]);
     setDoseEvents((current) => [...current, ...scheduledEvents]);
 
-    setRecipeModalOpen(false);
     resetRecipeWizard();
-    setTab("today");
     const alarmCount = scheduledEvents.filter((event) => event.notificationId).length;
     showNotice(
       "Receta lista",
       Platform.OS === "web"
-        ? "La receta quedo guardada. En navegador no se pueden mandar notificaciones del telefono; hay que probarlas en la app instalada."
+        ? "La receta quedó guardada. En navegador no se pueden mandar notificaciones del teléfono; hay que probarlas en la app instalada."
         : alarmCount > 0
-        ? "Las alarmas del telefono quedaron preparadas para esta receta."
-        : "La receta quedo guardada. Revisa los permisos de notificaciones para que suenen las alarmas.",
+        ? "Las alarmas del teléfono quedaron preparadas para esta receta."
+        : "La receta quedó guardada. Revisa los permisos de notificaciones para que suenen las alarmas.",
       alarmCount > 0 ? "success" : "warning"
     );
   }
 
   async function scheduleTestNotification() {
     if (Platform.OS === "web") {
-      const message = "En navegador no se pueden mandar notificaciones del telefono. Esta prueba hay que hacerla desde la app instalada.";
+      const message = "En navegador no se pueden mandar notificaciones del teléfono. Esta prueba hay que hacerla desde la app instalada.";
       setNotificationTestNotice(message);
       showNotice("Prueba no disponible", message, "warning");
       return;
     }
 
-    setNotificationTestNotice("Preparando prueba de notificacion...");
+    setNotificationTestNotice("Preparando prueba de notificación...");
     const allowed = await ensureNotificationPermission();
     if (!allowed) {
-      const message = "Activa las notificaciones del telefono para que MediMind pueda recordarte las dosis.";
+      const message = "Activa las notificaciones del teléfono para que Kura pueda recordarte las dosis.";
       setNotificationTestNotice(message);
       showNotice("Permiso pendiente", message, "warning");
       return;
@@ -1954,8 +2267,8 @@ export default function App() {
     try {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: "Prueba de MediMind",
-          body: "Si ves esto, las notificaciones ya estan funcionando.",
+          title: "Prueba de Kura",
+          body: "Si ves esto, las notificaciones ya están funcionando.",
           sound: true,
           priority: Notifications.AndroidNotificationPriority.MAX,
           vibrate: [0, 650, 250, 650],
@@ -1963,10 +2276,10 @@ export default function App() {
         },
         trigger: null
       });
-      setNotificationTestNotice("Prueba enviada. Debe aparecer una notificacion del telefono ahora.");
-      showNotice("Prueba enviada", "Debe aparecer una notificacion del telefono ahora.", "success");
+      setNotificationTestNotice("Prueba enviada. Debe aparecer una notificación del teléfono ahora.");
+      showNotice("Prueba enviada", "Debe aparecer una notificación del teléfono ahora.", "success");
     } catch {
-      const message = "El telefono no acepto la notificacion de prueba. Revisa permisos de la app y ahorro de bateria.";
+      const message = "El teléfono no aceptó la notificación de prueba. Revisa permisos de la app y ahorro de batería.";
       setNotificationTestNotice(message);
       showNotice("No se pudo probar", message, "danger");
     }
@@ -2298,7 +2611,7 @@ export default function App() {
     const profile = profiles.find((item) => item.id === profileId);
     requestConfirmation({
       title: "Eliminar perfil",
-      message: `Se eliminara ${profile?.name ?? "este perfil"} junto con sus recetas, medicamentos y registros.`,
+      message: `Se eliminará ${profile?.name ?? "este perfil"} junto con sus recetas, medicamentos y registros.`,
       confirmLabel: "Eliminar",
       danger: true,
       onConfirm: () => {
@@ -2322,7 +2635,7 @@ export default function App() {
 
     requestConfirmation({
       title: "Eliminar receta",
-      message: "Se eliminara la receta, sus medicamentos y alarmas pendientes.",
+      message: "Se eliminará la receta, sus medicamentos y alarmas pendientes.",
       confirmLabel: "Eliminar",
       danger: true,
       onConfirm: () => {
@@ -2339,7 +2652,7 @@ export default function App() {
     if (!DONATION_URL) {
       showNotice(
         "Donacion pendiente",
-        "Para activar este boton agrega un link real de Mercado Pago o PayPal.me. Para Mexico conviene dejar ambas opciones disponibles.",
+        "Para activar este botón agrega un link real de Mercado Pago o PayPal.me. Para México conviene dejar ambas opciones disponibles.",
         "info"
       );
       return;
@@ -2348,16 +2661,16 @@ export default function App() {
     void Linking.openURL(DONATION_URL);
   }
 
-  function buildContactText() {
-    return `Nombre: ${contactName || "Sin nombre"}\nContacto: ${contactMethod || "No indicado"}\nMensaje: ${contactMessage || "Sin mensaje"}`;
-  }
+function buildContactText() {
+  return `Nombre: ${contactName || "Sin nombre"}\nContacto: ${contactMethod || "No indicado"}\nMensaje: ${contactMessage || "Sin mensaje"}`;
+}
 
   function sendContactByWhatsapp() {
     void Linking.openURL(`https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(buildContactText())}`);
   }
 
   function sendContactByEmail() {
-    const subject = encodeURIComponent("Mensaje desde MediMind");
+    const subject = encodeURIComponent("Mensaje desde Kura");
     const body = encodeURIComponent(buildContactText());
     void Linking.openURL(`mailto:${CONTACT_EMAIL}?subject=${subject}&body=${body}`);
   }
@@ -2414,7 +2727,7 @@ export default function App() {
       <SafeAreaView style={styles.safe}>
         <AppStatusBar />
         <View style={styles.splashScreen}>
-          <Image source={MEDIMIND_LOGO} style={styles.splashLogo} resizeMode="contain" />
+          <KuraLogo size={190} />
           <Text style={styles.splashTitle}>{APP_NAME}</Text>
           <Text style={styles.splashTagline}>Tu salud a tiempo</Text>
         </View>
@@ -2425,8 +2738,8 @@ export default function App() {
   function renderAuthScreen() {
     const isRecover = authMode === "recover";
     const isSignup = authMode === "signup";
-    const actionLabel = isRecover ? "Recuperar acceso" : isSignup ? "Crear cuenta" : "Iniciar sesion";
-    const heading = isSignup ? "Crea tu cuenta" : isRecover ? "Recupera tu acceso" : "Iniciar sesion";
+    const actionLabel = isRecover ? "Recuperar acceso" : isSignup ? "Crear cuenta" : "Iniciar sesión";
+    const heading = isSignup ? "Crea tu cuenta" : isRecover ? "Recupera tu acceso" : "Iniciar sesión";
 
     return (
       <SafeAreaView style={styles.safe}>
@@ -2441,7 +2754,7 @@ export default function App() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.authBrand}>
-            <Image source={MEDIMIND_LOGO} style={styles.authLogo} resizeMode="contain" />
+            <KuraLogo size={118} />
             <Text style={styles.authAppName}>{APP_NAME}</Text>
             <Text style={styles.authTagline}>Tu salud a tiempo</Text>
           </View>
@@ -2449,7 +2762,96 @@ export default function App() {
           <View style={styles.authPanel}>
             <Text style={styles.authTitle}>{heading}</Text>
 
-            <FormSectionTitle title="Datos para iniciar sesion" />
+            {shouldShowSavedAccountLogin && selectedDeviceAccount ? (
+              <View style={styles.savedLoginStack}>
+                {deviceAccounts.length > 1 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.savedAccountChips}>
+                    {deviceAccounts.map((account) => {
+                      const active = account.id === selectedDeviceAccount.id;
+                      return (
+                        <Pressable
+                          key={account.id}
+                          style={[styles.savedAccountChip, active && styles.savedAccountChipActive]}
+                          onPress={() => {
+                            Keyboard.dismiss();
+                            setSelectedDeviceAccountId(account.id);
+                            setStoredAuthUser(account);
+                            setAuthSecret("");
+                          }}
+                        >
+                          <Text style={[styles.savedAccountChipText, active && styles.savedAccountChipTextActive]}>{account.name}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                ) : null}
+
+                <View style={styles.biometricPanel}>
+                  <Fingerprint color={theme.colors.primaryDark} size={24} />
+                  <View style={styles.flex}>
+                    <Text style={styles.cardTitle}>{selectedDeviceAccount.name}</Text>
+                    <Text style={styles.muted}>Cuenta guardada en este teléfono.</Text>
+                  </View>
+                </View>
+
+                {selectedDeviceAccount.provider === "email" ? (
+                  <>
+                    <FloatingInput label="Contraseña" value={authSecret} onChangeText={setAuthSecret} secureTextEntry />
+                    <Pressable style={styles.secondaryButton} onPress={() => void loginSavedAccountWithPassword()}>
+                      <Text style={styles.secondaryButtonText}>Entrar con contraseña</Text>
+                    </Pressable>
+                  </>
+                ) : null}
+
+                {biometricAvailable ? (
+                  <Pressable style={styles.primaryButton} onPress={() => void unlockWithBiometrics(selectedDeviceAccount)} disabled={biometricChecking}>
+                    <Fingerprint color={theme.colors.white} size={18} />
+                    <Text style={styles.primaryButtonText}>{biometricChecking ? "Revisando" : "Entrar con huella"}</Text>
+                  </Pressable>
+                ) : (
+                  <View style={styles.authNotice}>
+                    <BadgeInfo color={theme.colors.primaryDark} size={18} />
+                    <Text style={styles.authNoticeText}>Configura huella o biometría en el teléfono para activar esta entrada rápida.</Text>
+                  </View>
+                )}
+
+                {authNotice ? (
+                  <View style={styles.authNotice}>
+                    <BadgeInfo color={theme.colors.primaryDark} size={18} />
+                    <Text style={styles.authNoticeText}>{authNotice}</Text>
+                  </View>
+                ) : null}
+
+                <Pressable
+                  style={styles.authLinkButton}
+                  onPress={() => {
+                    setUseManualAuthForm(true);
+                    setAuthSecret("");
+                    setAuthNotice("");
+                    setAuthMode("login");
+                  }}
+                >
+                  <Text style={styles.authInlineText}>¿Quieres usar otra cuenta?</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {false && authMode === "login" && biometricAvailable && storedAuthUser ? (
+              <View style={styles.biometricPanel}>
+                <Fingerprint color={theme.colors.primaryDark} size={24} />
+                <View style={styles.flex}>
+                  <Text style={styles.cardTitle}>Sesión guardada</Text>
+                  <Text style={styles.muted}>Entra como {storedAuthUser.name} con la huella o biometría de este teléfono.</Text>
+                </View>
+                <Pressable style={styles.biometricButton} onPress={() => void unlockWithBiometrics()} disabled={biometricChecking}>
+                  <Text style={styles.primaryButtonText}>{biometricChecking ? "Revisando" : "Entrar"}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            {!shouldShowSavedAccountLogin ? <FormSectionTitle title="Datos para iniciar sesión" /> : null}
+            {!shouldShowSavedAccountLogin ? (
+              <>
             <View style={styles.authMethodRow}>
               <Pressable
                 style={[styles.authMethodButton, authMethod === "email" && styles.authMethodButtonActive]}
@@ -2467,6 +2869,7 @@ export default function App() {
                 onPress={() => {
                   setAuthMethod("phone");
                   setPhoneCodeState(null);
+                  nativePhoneConfirmationRef.current = null;
                   setAuthSecret("");
                   setAuthNotice("");
                 }}
@@ -2477,25 +2880,28 @@ export default function App() {
 
             {isSignup ? <FloatingInput label="Nombre" value={authName} onChangeText={setAuthName} /> : null}
             <FloatingInput
-              label={authMethod === "email" ? "Correo" : "Numero celular"}
+              label={authMethod === "email" ? "Correo" : "Número celular"}
               value={authIdentifier}
               onChangeText={setAuthIdentifier}
               keyboardType={authMethod === "email" ? "email-address" : "phone-pad"}
             />
             {authMethod === "phone" ? (
-              <Pressable style={styles.secondaryButton} onPress={sendPhoneCode}>
+              <Pressable style={styles.secondaryButton} onPress={() => void sendPhoneCode()}>
                 <MessageCircle color={theme.colors.primaryDark} size={18} />
-                <Text style={styles.secondaryButtonText}>{phoneCodeState ? "Reenviar codigo" : "Enviar codigo"}</Text>
+                <Text style={styles.secondaryButtonText}>{phoneCodeState ? "Reenviar código" : "Enviar código"}</Text>
               </Pressable>
             ) : null}
             {((authMethod === "email" && !isRecover) || (authMethod === "phone" && phoneCodeState)) ? (
               <FloatingInput
-                label={authMethod === "email" ? "Contrasena" : "Codigo de verificacion"}
+                label={authMethod === "email" ? "Contraseña" : "Código de verificación"}
                 value={authSecret}
                 onChangeText={setAuthSecret}
                 secureTextEntry={authMethod === "email"}
                 keyboardType={authMethod === "email" ? "default" : "numeric"}
               />
+            ) : null}
+            {isSignup && authMethod === "email" ? (
+              <Text style={styles.passwordHint}>Usa al menos 6 caracteres. Mejor si combinas letras y números.</Text>
             ) : null}
 
             {authNotice ? (
@@ -2511,17 +2917,17 @@ export default function App() {
 
             {!isRecover ? (
               <Pressable style={styles.authLinkButton} onPress={() => resetAuthForm("recover")}>
-                <Text style={styles.authInlineText}>¿Olvidaste tu contraseña? <Text style={styles.authInlineLink}>Recuperala</Text></Text>
+                <Text style={styles.authInlineText}>¿Olvidaste tu contraseña? <Text style={styles.authInlineLink}>Recupérala</Text></Text>
               </Pressable>
             ) : (
               <Pressable style={styles.authLinkButton} onPress={() => resetAuthForm("login")}>
-                <Text style={styles.authInlineText}>Ya recorde mi acceso. <Text style={styles.authInlineLink}>Iniciar sesion</Text></Text>
+                <Text style={styles.authInlineText}>Ya recordé mi acceso. <Text style={styles.authInlineLink}>Iniciar sesión</Text></Text>
               </Pressable>
             )}
 
             {!isRecover ? (
               <>
-                <Text style={styles.authDividerText}>Otras opciones de inicio de sesion</Text>
+                <Text style={styles.authDividerText}>Otras opciones de inicio de sesión</Text>
                 <View style={styles.socialButtons}>
                   <Pressable style={styles.socialButton} onPress={() => void handleSocialSignIn("google")}>
                     <GoogleLogo />
@@ -2537,9 +2943,11 @@ export default function App() {
               <Pressable style={styles.authLinkButton} onPress={() => resetAuthForm(isSignup ? "login" : "signup")}>
                 <Text style={styles.authInlineText}>
                   {isSignup ? "¿Ya tienes cuenta? " : "¿No tienes cuenta? "}
-                  <Text style={styles.authInlineLink}>{isSignup ? "Inicia sesion" : "Crea una"}</Text>
+                  <Text style={styles.authInlineLink}>{isSignup ? "Inicia sesión" : "Crea una"}</Text>
                 </Text>
               </Pressable>
+            ) : null}
+              </>
             ) : null}
           </View>
         </ScrollView>
@@ -2665,7 +3073,7 @@ export default function App() {
 
         <SectionTitle title="COMPLETADO" />
         {completedToday.length === 0 ? (
-          <EmptyState text="Aun no hay tomas completadas hoy." />
+          <EmptyState text="Aún no hay tomas completadas hoy." />
         ) : (
           completedToday.map((event) => <DoseRow key={event.id} event={event} medication={medicationFor(event)} doseMarker={doseMarkerFor(event)} onTaken={() => undefined} onSnooze={() => undefined} onSkip={() => undefined} />)
         )}
@@ -3028,9 +3436,9 @@ export default function App() {
         <View style={styles.aboutPanel}>
           <View style={styles.aboutCentered}>
             <Info color={theme.colors.primaryDark} size={26} />
-            <Text style={styles.cardTitle}>Acerca de MediMind</Text>
-            <Text style={styles.mutedCentered}>MediMind ayuda a recordar tratamientos registrados por la persona. No recomienda dosis ni sustituye indicaciones medicas.</Text>
-            <Text style={styles.mutedCentered}>Version {APP_VERSION} - Desarrollado por @{DEVELOPER_GITHUB}</Text>
+            <Text style={styles.cardTitle}>Acerca de Kura</Text>
+            <Text style={styles.mutedCentered}>Kura ayuda a recordar tratamientos registrados por la persona. No recomienda dosis ni sustituye indicaciones médicas.</Text>
+            <Text style={styles.mutedCentered}>Versión {APP_VERSION} - Desarrollado por @{DEVELOPER_GITHUB}</Text>
             <Text style={styles.mutedCentered}>Esta app se hace sin fines de lucro para que organizar medicamentos sea menos pesado para familias y cuidadores.</Text>
           </View>
           <View style={styles.aboutActions}>
@@ -3039,7 +3447,7 @@ export default function App() {
             </Pressable>
             <Pressable style={styles.secondaryButton} onPress={() => setAboutModalOpen(true)}>
               <MessageCircle color={theme.colors.primaryDark} size={18} />
-              <Text style={styles.secondaryButtonText}>Contactame</Text>
+              <Text style={styles.secondaryButtonText}>Contáctame</Text>
             </Pressable>
           </View>
           <Pressable style={[styles.secondaryButton, styles.fullWidthButton]} onPress={() => startTutorial()}>
@@ -3055,11 +3463,11 @@ export default function App() {
             <UserRound color={theme.colors.primaryDark} size={21} />
             <View style={styles.flex}>
               <Text style={styles.cardTitle}>Cuenta</Text>
-              <Text style={styles.muted}>{authUser?.name ?? "Usuario MediMind"} - {authUser?.identifier ?? "Sesion local"}</Text>
+              <Text style={styles.muted}>{authUser?.name ?? "Usuario Kura"} - {authUser?.identifier ?? "Sesión local"}</Text>
             </View>
           </View>
           <Pressable style={styles.secondaryButton} onPress={() => void signOut()}>
-            <Text style={styles.secondaryButtonText}>Cerrar sesion</Text>
+            <Text style={styles.secondaryButtonText}>Cerrar sesión</Text>
           </Pressable>
         </View>
       </View>
@@ -3073,6 +3481,19 @@ export default function App() {
 
     const localSnapshot = usageSnapshotFromState(profiles, recipes, medications, doseEvents);
     const localUserCount = Math.max(localUsers.length, authUser ? 1 : 0);
+    const usingRemoteStats = Boolean(remoteAdminStats);
+    const adminSubtitle = !hasFirebaseConfig()
+      ? "Estadísticas locales hasta conectar Firebase"
+      : adminStatsLoading
+        ? "Actualizando estadísticas de Firebase"
+        : usingRemoteStats
+          ? `${remoteAdminStats?.userCount ?? 0} usuarios en Firebase`
+          : adminStatsError || "Sin datos remotos todavía";
+    const latestSyncText = remoteAdminStats?.latestSyncAt
+      ? `Última actividad: ${formatShortDate(remoteAdminStats.latestSyncAt)} - ${formatTime(remoteAdminStats.latestSyncAt)}`
+      : adminStatsSyncedAt
+        ? `Panel actualizado: ${formatShortDate(adminStatsSyncedAt)} - ${formatTime(adminStatsSyncedAt)}`
+        : "Panel listo para sincronizar";
 
     return (
       <View style={styles.adminPanel}>
@@ -3080,20 +3501,30 @@ export default function App() {
           <Sparkles color={theme.colors.primaryDark} size={21} />
           <View style={styles.flex}>
             <Text style={styles.cardTitle}>Panel admin</Text>
-            <Text style={styles.muted}>
-              {remoteAdminStats
-                ? `${remoteAdminStats.userCount} usuarios en Firebase`
-                : hasFirebaseConfig()
-                  ? "Conectando estadisticas de Firebase"
-                  : "Estadisticas locales hasta conectar Firebase"}
-            </Text>
+            <Text style={styles.muted}>{adminSubtitle}</Text>
           </View>
+          <Pressable style={styles.adminRefreshButton} onPress={() => void refreshAdminStats()} disabled={adminStatsLoading}>
+            <RotateCcw color={theme.colors.primaryDark} size={16} />
+            <Text style={styles.adminRefreshText}>{adminStatsLoading ? "Leyendo" : "Actualizar"}</Text>
+          </Pressable>
         </View>
         <View style={styles.adminGrid}>
           <AdminMetric label="Usuarios" value={`${remoteAdminStats?.userCount ?? localUserCount}`} />
-          <AdminMetric label="Perfiles" value={`${localSnapshot.profileCount}`} />
-          <AdminMetric label="Tratamientos" value={`${localSnapshot.recipeCount}`} />
-          <AdminMetric label="Dosis completadas" value={`${localSnapshot.completedDoseCount}`} />
+          <AdminMetric label="Usuarios activos" value={`${remoteAdminStats?.activeUserCount ?? (localSnapshot.profileCount > 0 ? 1 : 0)}`} />
+          <AdminMetric label="Perfiles" value={`${remoteAdminStats?.profileCount ?? localSnapshot.profileCount}`} />
+          <AdminMetric label="Tratamientos" value={`${remoteAdminStats?.recipeCount ?? localSnapshot.recipeCount}`} />
+          <AdminMetric label="Medicamentos" value={`${remoteAdminStats?.medicationCount ?? localSnapshot.medicationCount}`} />
+          <AdminMetric label="Dosis registradas" value={`${remoteAdminStats?.doseEventCount ?? localSnapshot.doseEventCount}`} />
+          <AdminMetric label="Completadas" value={`${remoteAdminStats?.completedDoseCount ?? localSnapshot.completedDoseCount}`} />
+          <AdminMetric label="Omitidas" value={`${remoteAdminStats?.skippedDoseCount ?? localSnapshot.skippedDoseCount}`} />
+        </View>
+        <View style={styles.adminStatusBox}>
+          <Text style={styles.adminStatusText}>{latestSyncText}</Text>
+          <Text style={styles.adminFootnote}>
+            {usingRemoteStats
+              ? "Estos números son agregados; no muestran recetas ni datos personales de otros usuarios."
+              : "Mientras no haya lectura remota, el panel muestra tu información local de prueba."}
+          </Text>
         </View>
       </View>
     );
@@ -3103,7 +3534,7 @@ export default function App() {
     return (
       <>
         <FloatingInput label="Nombre" value={profileName} onChangeText={setProfileName} />
-        <FloatingInput label="Relacion" value={profileRelationship} onChangeText={setProfileRelationship} />
+        <FloatingInput label="Relación" value={profileRelationship} onChangeText={setProfileRelationship} />
         <AgeSelector value={profileAge} onChange={setProfileAge} />
 
         <Field label="Icono">
@@ -3145,7 +3576,7 @@ export default function App() {
             automaticallyAdjustKeyboardInsets
             showsVerticalScrollIndicator={false}
           >
-            <Image source={MEDIMIND_LOGO} style={styles.firstProfileLogo} resizeMode="contain" />
+            <KuraLogo size={108} />
             <Text style={[styles.profileTitle, styles.centeredTitle]}>Crea tu primer perfil</Text>
             <Text style={styles.firstProfileText}>Este perfil nos ayuda a organizar recetas, inventario y recordatorios desde el primer tratamiento.</Text>
             <View style={styles.firstProfileCard}>
@@ -3191,7 +3622,7 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safe}>
       <AppStatusBar />
-      <KeyboardAvoidingView style={styles.appShell} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <KeyboardAvoidingView style={styles.appShell} behavior={Platform.OS === "ios" ? "padding" : "height"} onTouchStart={markActivity}>
         {tab !== "profile" ? (
           <View style={styles.topBar}>
             <ProfileSwitcher profiles={profiles} selectedProfileId={selectedProfileId} onSelect={setSelectedProfileId} onAdd={() => openProfileModal()} />
@@ -3240,8 +3671,8 @@ export default function App() {
         {recipeStep === "photo" ? (
           <View style={styles.modalStack}>
             <FormSectionTitle title="Tratamiento" />
-            <FloatingInput label="Nombre del tratamiento o diagnostico" value={recipeTitle} onChangeText={setRecipeTitle} error={visibleRecipeErrors.title} />
-            {visibleRecipeErrors.title ? <Text style={styles.inlineErrorText}>Agrega el nombre del tratamiento o diagnostico.</Text> : null}
+            <FloatingInput label="Nombre del tratamiento o diagnóstico" value={recipeTitle} onChangeText={setRecipeTitle} error={visibleRecipeErrors.title} />
+            {visibleRecipeErrors.title ? <Text style={styles.inlineErrorText}>Agrega el nombre del tratamiento o diagnóstico.</Text> : null}
             <DoctorInput prefix={recipeDoctorPrefix} name={recipeDoctor} onPrefixChange={setRecipeDoctorPrefix} onNameChange={setRecipeDoctor} nameError={visibleRecipeErrors.doctor} />
             <View style={styles.reviewNotice}>
               <Camera color={theme.colors.primaryDark} size={20} />
@@ -3263,7 +3694,7 @@ export default function App() {
             {recipePhotoUri ? (
               <View style={styles.scanPrototypeNotice}>
                 <BadgeInfo color={theme.colors.primaryDark} size={19} />
-                <Text style={styles.scanPrototypeText}>El escaneo esta en pruebas y puede cometer errores. Usalo si quieres probarlo y revisa cada dato antes de guardar.</Text>
+                <Text style={styles.scanPrototypeText}>El escaneo está en pruebas y puede cometer errores. Úsalo si quieres probarlo y revisa cada dato antes de guardar.</Text>
               </View>
             ) : null}
             {recipePhotoUri ? (
@@ -3333,7 +3764,7 @@ export default function App() {
           <View style={styles.modalStack}>
             <View style={styles.reviewNotice}>
               <AlarmClockCheck color={theme.colors.primaryDark} size={22} />
-              <Text style={styles.reviewText}>Se activaran alarmas con los medicamentos guardados.</Text>
+              <Text style={styles.reviewText}>Se activarán alarmas con los medicamentos guardados.</Text>
             </View>
             {wizardDrafts
               .filter((item) => item.confirmed)
@@ -3350,7 +3781,7 @@ export default function App() {
               ))}
             <Pressable style={[styles.secondaryButton, styles.fullWidthButton]} onPress={() => void scheduleTestNotification()}>
               <BellRing color={theme.colors.primaryDark} size={18} />
-              <Text style={styles.secondaryButtonText}>Probar notificacion</Text>
+              <Text style={styles.secondaryButtonText}>Probar notificación</Text>
             </Pressable>
             {notificationTestNotice ? (
               <View style={styles.testNotice}>
@@ -3368,7 +3799,7 @@ export default function App() {
       <ModalShell visible={editModalOpen} title="Editar receta" onClose={() => setEditModalOpen(false)}>
         <View style={styles.modalStack}>
           <FormSectionTitle title="Tratamiento" />
-          <FloatingInput label="Nombre del tratamiento o diagnostico" value={editRecipeTitle} onChangeText={setEditRecipeTitle} />
+          <FloatingInput label="Nombre del tratamiento o diagnóstico" value={editRecipeTitle} onChangeText={setEditRecipeTitle} />
           <DoctorInput prefix={editRecipeDoctorPrefix} name={editRecipeDoctor} onPrefixChange={setEditRecipeDoctorPrefix} onNameChange={setEditRecipeDoctor} />
 
           {editingRecipe ? <SourceBadge source={editingRecipe.source} /> : null}
@@ -3485,7 +3916,7 @@ export default function App() {
         </View>
       </ModalShell>
 
-      <ModalShell visible={aboutModalOpen} title="Contactame" onClose={() => setAboutModalOpen(false)}>
+      <ModalShell visible={aboutModalOpen} title="Contáctame" onClose={() => setAboutModalOpen(false)}>
         <View style={styles.contactFormStack}>
           <FormSectionTitle title="Contacto" />
           <FloatingInput label="Tu nombre" value={contactName} onChangeText={setContactName} />
@@ -3506,8 +3937,8 @@ export default function App() {
 
       <ModalShell visible={skipModalOpen} title="Omitir dosis" onClose={() => setSkipModalOpen(false)}>
         <View style={styles.modalStack}>
-          <Text style={styles.muted}>MediMind guardara el motivo para que aparezca en el historial.</Text>
-          <FloatingInput label="Motivo de omision" value={skipReason} onChangeText={setSkipReason} multiline />
+          <Text style={styles.muted}>Kura guardará el motivo para que aparezca en el historial.</Text>
+          <FloatingInput label="Motivo de omisión" value={skipReason} onChangeText={setSkipReason} multiline />
           <Pressable style={styles.dangerButton} onPress={confirmSkipDose}>
             <X color={theme.colors.white} size={18} />
             <Text style={styles.primaryButtonText}>Omitir dosis</Text>
@@ -3624,7 +4055,7 @@ function RecipeWizardSteps({ current, onSelect }: { current: RecipeStep; onSelec
   const steps: Array<{ key: RecipeStep; label: string; stepLabel: string }> = [
     { key: "photo", label: "Foto", stepLabel: "Paso 1" },
     { key: "medications", label: "Medicamento", stepLabel: "Paso 2" },
-    { key: "alarms", label: "Alarmas", stepLabel: "Ultimo paso" }
+    { key: "alarms", label: "Alarmas", stepLabel: "Último paso" }
   ];
 
   return (
@@ -3988,9 +4419,11 @@ function FloatingInput({
   error?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const active = focused || value.length > 0;
   const inputRef = useRef<TextInput>(null);
   const labelProgress = useRef(new Animated.Value(active ? 1 : 0)).current;
+  const canTogglePassword = secureTextEntry;
 
   useEffect(() => {
     Animated.timing(labelProgress, {
@@ -4024,15 +4457,26 @@ function FloatingInput({
         value={value}
         onChangeText={onChangeText}
         keyboardType={keyboardType}
-        secureTextEntry={secureTextEntry}
+        secureTextEntry={secureTextEntry && !passwordVisible}
         multiline={multiline}
         onFocus={() => {
           closeOpenDropdowns();
           setFocused(true);
         }}
         onBlur={() => setFocused(false)}
-        style={[styles.floatingInput, multiline && styles.floatingInputMultiline]}
+        style={[styles.floatingInput, canTogglePassword && styles.floatingInputWithIcon, multiline && styles.floatingInputMultiline]}
       />
+      {canTogglePassword ? (
+        <Pressable
+          style={styles.passwordToggle}
+          onPress={(event) => {
+            event.stopPropagation();
+            setPasswordVisible((visible) => !visible);
+          }}
+        >
+          {passwordVisible ? <EyeOff color={theme.colors.primaryDark} size={20} /> : <Eye color={theme.colors.primaryDark} size={20} />}
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }
@@ -4050,45 +4494,94 @@ function FormSectionTitle({ title }: { title: string }) {
   return <Text style={styles.formSectionTitle}>{title.toUpperCase()}</Text>;
 }
 
+type PickerOption = {
+  label: string;
+  value: string;
+  color?: string;
+  iconOnly?: boolean;
+};
+
+function PickerModal({
+  visible,
+  title,
+  options,
+  value,
+  onSelect,
+  onClose
+}: {
+  visible: boolean;
+  title: string;
+  options: PickerOption[];
+  value: string;
+  onSelect: (value: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+      <Pressable style={styles.pickerOverlay} onPress={onClose}>
+        <Pressable style={styles.pickerSheet} onPress={(event) => event.stopPropagation()}>
+          <View style={styles.pickerHeader}>
+            <Text style={styles.pickerTitle}>{title}</Text>
+            <Pressable style={styles.modalClose} onPress={onClose}>
+              <X color={theme.colors.ink} size={20} />
+            </Pressable>
+          </View>
+          <ScrollView
+            style={styles.pickerScroll}
+            contentContainerStyle={styles.pickerContent}
+            keyboardShouldPersistTaps="always"
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={false}
+          >
+            {options.map((option) => {
+              const active = option.value === value;
+              return (
+                <Pressable
+                  key={option.value}
+                  style={[styles.pickerOption, active && styles.pickerOptionActive]}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    onSelect(option.value);
+                    onClose();
+                  }}
+                >
+                  {option.color ? <View style={[styles.colorPreviewDot, { backgroundColor: option.color }]} /> : null}
+                  {!option.iconOnly ? <Text style={[styles.pickerOptionText, active && styles.pickerOptionTextActive]}>{option.label}</Text> : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
 function UnitSelector({ value, onChange, error = false }: { value: string; onChange: (value: string) => void; error?: boolean }) {
   const [unitOpen, setUnitOpen] = useState(false);
 
   useEffect(() => registerDropdownCloser(() => setUnitOpen(false)), []);
 
   return (
-    <View style={[styles.dropdownField, unitOpen && styles.dropdownFieldOpen]}>
+    <View style={styles.dropdownField}>
       <Pressable
         style={[styles.dropdownButton, error && styles.inputError]}
         onPress={() => {
-          if (unitOpen) {
-            setUnitOpen(false);
-          } else {
-            closeOpenDropdowns();
-            setUnitOpen(true);
-          }
+          Keyboard.dismiss();
+          closeOpenDropdowns();
+          setUnitOpen(true);
         }}
       >
         <Text style={[styles.dropdownText, !value && styles.dropdownPlaceholderText]}>{value ? unitLabelText(value) : "Unidad"}</Text>
       </Pressable>
-      {unitOpen ? (
-        <View style={styles.dropdownPanel}>
-          {unitOptions.map((unit) => {
-            const active = unit.toLowerCase() === value.toLowerCase();
-            return (
-              <Pressable
-                key={unit}
-                style={[styles.dropdownOption, active && styles.dropdownOptionActive]}
-                onPress={() => {
-                  onChange(unit);
-                  setUnitOpen(false);
-                }}
-              >
-                <Text style={[styles.dropdownOptionText, active && styles.dropdownOptionTextActive]}>{unit}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
+      <PickerModal
+        visible={unitOpen}
+        title="Unidad"
+        options={unitOptions.map((unit) => ({ label: unit, value: unit }))}
+        value={value}
+        onSelect={onChange}
+        onClose={() => setUnitOpen(false)}
+      />
     </View>
   );
 }
@@ -4116,34 +4609,21 @@ function DoctorInput({
           <Pressable
             style={styles.dropdownButton}
             onPress={() => {
-              if (open) {
-                setOpen(false);
-              } else {
-                closeOpenDropdowns();
-                setOpen(true);
-              }
+              Keyboard.dismiss();
+              closeOpenDropdowns();
+              setOpen(true);
             }}
           >
             <Text style={styles.dropdownText}>{prefix}</Text>
           </Pressable>
-          {open ? (
-            <View style={styles.dropdownPanel}>
-              <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator persistentScrollbar style={styles.dropdownScroll}>
-                {doctorPrefixOptions.map((option) => (
-                  <Pressable
-                    key={option}
-                    style={[styles.dropdownOption, option === prefix && styles.dropdownOptionActive]}
-                    onPress={() => {
-                      onPrefixChange(option);
-                      setOpen(false);
-                    }}
-                  >
-                    <Text style={[styles.dropdownOptionText, option === prefix && styles.dropdownOptionTextActive]}>{option}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          ) : null}
+          <PickerModal
+            visible={open}
+            title="Título"
+            options={doctorPrefixOptions.map((option) => ({ label: option, value: option }))}
+            value={prefix}
+            onSelect={onPrefixChange}
+            onClose={() => setOpen(false)}
+          />
         </View>
         <View style={styles.formMainField}>
           <FloatingInput label="Nombre del doctor" value={name} onChangeText={onNameChange} error={nameError} />
@@ -4158,50 +4638,38 @@ function AgeDropdown({
   value,
   options,
   onSelect,
-  placeholder = "Selecciona"
+  placeholder = "Selecciona",
+  compact = false
 }: {
   value: string;
   options: string[];
   onSelect: (value: string) => void;
   placeholder?: string;
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const panelHeight = Math.min(options.length * 42 + 16, 188);
   useEffect(() => registerDropdownCloser(() => setOpen(false)), []);
 
   return (
-    <View style={[styles.ageDropdown, open && styles.ageDropdownOpen]}>
+    <View style={[styles.ageDropdown, compact && styles.compactDropdown]}>
       <Pressable
-        style={styles.dropdownButton}
+        style={[styles.dropdownButton, compact && styles.compactDropdownButton]}
         onPress={() => {
-          if (open) {
-            setOpen(false);
-          } else {
-            closeOpenDropdowns();
-            setOpen(true);
-          }
+          Keyboard.dismiss();
+          closeOpenDropdowns();
+          setOpen(true);
         }}
       >
         <Text style={[styles.dropdownText, !value && styles.dropdownPlaceholderText]}>{value || placeholder}</Text>
       </Pressable>
-      {open ? (
-        <View style={[styles.ageDropdownPanel, { height: panelHeight }]}>
-          <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator persistentScrollbar style={styles.dropdownScroll}>
-            {options.map((option) => (
-              <Pressable
-                key={option}
-                style={[styles.dropdownOption, option === value && styles.dropdownOptionActive]}
-                onPress={() => {
-                  onSelect(option);
-                  setOpen(false);
-                }}
-              >
-                <Text style={[styles.dropdownOptionText, option === value && styles.dropdownOptionTextActive]}>{option}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-      ) : null}
+      <PickerModal
+        visible={open}
+        title={placeholder}
+        options={options.map((option) => ({ label: option, value: option }))}
+        value={value}
+        onSelect={onSelect}
+        onClose={() => setOpen(false)}
+      />
     </View>
   );
 }
@@ -4232,30 +4700,106 @@ function AgeSelector({ value, onChange }: { value: string; onChange: (value: str
   );
 }
 
+function TimeWheelColumn({ label, value, options, onSelect }: { label: string; value: string; options: string[]; onSelect: (value: string) => void }) {
+  return (
+    <View style={styles.timeWheelColumn}>
+      <Text style={styles.timeWheelLabel}>{label}</Text>
+      <View style={styles.timeWheelFrame}>
+        <ScrollView
+          nestedScrollEnabled
+          scrollEnabled
+          keyboardShouldPersistTaps="always"
+          showsVerticalScrollIndicator={false}
+          style={styles.timeWheelScroll}
+          contentContainerStyle={styles.timeWheelContent}
+          onStartShouldSetResponder={() => true}
+          onMoveShouldSetResponder={() => true}
+        >
+          {options.map((option) => {
+            const active = option === value;
+            return (
+              <Pressable key={option} style={[styles.timeWheelOption, active && styles.timeWheelOptionActive]} onPress={() => onSelect(option)}>
+                <Text style={[styles.timeWheelText, active && styles.timeWheelTextActive]}>{option}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        <View pointerEvents="none" style={styles.timeWheelCenterLine} />
+      </View>
+    </View>
+  );
+}
+
 function TimeSelector({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const [hour = "", minute = ""] = value.split(":");
+  const [open, setOpen] = useState(false);
+  const [draftValue, setDraftValue] = useState(value || currentTimeKey(new Date()));
+  const [hour = "", minute = ""] = draftValue.split(":");
   const hourOptions = Array.from({ length: 24 }, (_, index) => index.toString().padStart(2, "0"));
   const minuteOptions = Array.from({ length: 60 }, (_, index) => index.toString().padStart(2, "0"));
 
   function updateTime(nextHour = hour, nextMinute = minute) {
     const fallback = currentTimeKey(new Date());
     const [fallbackHour, fallbackMinute] = fallback.split(":");
-    onChange(`${nextHour || fallbackHour}:${nextMinute || fallbackMinute}`);
+    setDraftValue(`${nextHour || fallbackHour}:${nextMinute || fallbackMinute}`);
   }
 
   return (
     <Field label="Hora de inicio (opcional)">
-      <View style={[styles.formRow, styles.ageSelectorRow]}>
-        <View style={styles.formSideField}>
-          <Text style={styles.timePartLabel}>Hora</Text>
-          <AgeDropdown value={hour} options={hourOptions} placeholder="Hora" onSelect={(nextHour) => updateTime(nextHour, minute)} />
-        </View>
-        <View style={styles.formSideField}>
-          <Text style={styles.timePartLabel}>Minutos</Text>
-          <AgeDropdown value={minute} options={minuteOptions} placeholder="Min" onSelect={(nextMinute) => updateTime(hour, nextMinute)} />
-        </View>
+      <Pressable
+        style={styles.timeDisplayButton}
+        onPress={() => {
+          Keyboard.dismiss();
+          closeOpenDropdowns();
+          setDraftValue(value || currentTimeKey(new Date()));
+          setOpen(true);
+        }}
+      >
+        <Clock3 color={theme.colors.primaryDark} size={18} />
+        <Text style={[styles.timeDisplayText, !value && styles.dropdownPlaceholderText]}>{value ? normalizeTimeValue(value) : "Elegir hora"}</Text>
+      </Pressable>
+      <View style={styles.timeQuickRow}>
+        <Pressable
+          style={styles.timeQuickButton}
+          onPress={() => {
+            const [currentHour, currentMinute] = currentTimeKey(new Date()).split(":");
+            onChange(`${currentHour}:${currentMinute}`);
+          }}
+        >
+          <Text style={styles.timeQuickText}>Usar hora actual</Text>
+        </Pressable>
+        {value ? (
+          <Pressable style={styles.timeClearButton} onPress={() => onChange("")}>
+            <Text style={styles.timeClearText}>Dejar vacía</Text>
+          </Pressable>
+        ) : null}
       </View>
-      <Text style={styles.timeSelectorHint}>Si la dejas vacia, se usara la hora actual al activar el tratamiento.</Text>
+      <Text style={styles.timeSelectorHint}>Si la dejas vacía, se usará la hora actual al activar el tratamiento.</Text>
+      <Modal visible={open} animationType="fade" transparent onRequestClose={() => setOpen(false)}>
+        <Pressable style={styles.pickerOverlay} onPress={() => setOpen(false)}>
+          <Pressable style={styles.timePickerSheet} onPress={(event) => event.stopPropagation()}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>Hora de inicio</Text>
+              <Pressable style={styles.modalClose} onPress={() => setOpen(false)}>
+                <X color={theme.colors.ink} size={20} />
+              </Pressable>
+            </View>
+            <View style={styles.timeWheel}>
+              <TimeWheelColumn label="Hora" value={hour} options={hourOptions} onSelect={(nextHour) => updateTime(nextHour, minute)} />
+              <Text style={styles.timeSeparator}>:</Text>
+              <TimeWheelColumn label="Min" value={minute} options={minuteOptions} onSelect={(nextMinute) => updateTime(hour, nextMinute)} />
+            </View>
+            <Pressable
+              style={styles.primaryButton}
+              onPress={() => {
+                onChange(draftValue);
+                setOpen(false);
+              }}
+            >
+              <Text style={styles.primaryButtonText}>Confirmar hora</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Field>
   );
 }
@@ -4265,37 +4809,26 @@ function ColorSelector({ value, onChange }: { value: string; onChange: (value: s
   useEffect(() => registerDropdownCloser(() => setOpen(false)), []);
 
   return (
-    <View style={[styles.profileColorOption, open && styles.profileColorOptionOpen]}>
+    <View style={styles.profileColorOption}>
       <Text style={styles.profileColorTitle}>Color del perfil</Text>
       <Pressable
         style={styles.colorDropdownButton}
         onPress={() => {
-          if (open) {
-            setOpen(false);
-          } else {
-            closeOpenDropdowns();
-            setOpen(true);
-          }
+          Keyboard.dismiss();
+          closeOpenDropdowns();
+          setOpen(true);
         }}
       >
         <View style={[styles.colorPreviewDot, { backgroundColor: value }]} />
       </Pressable>
-      {open ? (
-        <View style={styles.colorDropdownPanel}>
-          {colorOptions.map((color) => (
-            <Pressable
-              key={color}
-              style={[styles.colorOptionRow, value === color && styles.colorOptionRowActive]}
-              onPress={() => {
-                onChange(color);
-                setOpen(false);
-              }}
-            >
-              <View style={[styles.colorPreviewDot, { backgroundColor: color }]} />
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
+      <PickerModal
+        visible={open}
+        title="Color del perfil"
+        options={colorOptions.map((color) => ({ label: "", value: color, color, iconOnly: true }))}
+        value={value}
+        onSelect={onChange}
+        onClose={() => setOpen(false)}
+      />
     </View>
   );
 }
@@ -4355,12 +4888,12 @@ function MedicationDraftForm({
           />
         </View>
         <View style={styles.formThirdField}>
-          <FloatingInput label="Por cuantos dias" value={numberInputValue(draft.durationDays)} onChangeText={(value) => onChange({ ...draft, durationDays: Number(sanitizeNumericInput(value)) || 0 })} keyboardType="numeric" error={Boolean(errors?.durationDays)} />
+          <FloatingInput label="Por cuántos días" value={numberInputValue(draft.durationDays)} onChangeText={(value) => onChange({ ...draft, durationDays: Number(sanitizeNumericInput(value)) || 0 })} keyboardType="numeric" error={Boolean(errors?.durationDays)} />
         </View>
       </View>
-      {errors?.unitLabel || errors?.dose || errors?.durationDays ? <Text style={styles.inlineErrorText}>Completa unidad, dosis y dias del tratamiento.</Text> : null}
+      {errors?.unitLabel || errors?.dose || errors?.durationDays ? <Text style={styles.inlineErrorText}>Completa unidad, dosis y días del tratamiento.</Text> : null}
 
-      <Field label="Cada cuanto">
+      <Field label="Cada cuánto">
         <View style={styles.frequencyGrid}>
           {frequencyPresets.map((option) => {
             const active = draft.frequencyMinutes === option.minutes;
@@ -4375,7 +4908,7 @@ function MedicationDraftForm({
           </Pressable>
         </View>
       </Field>
-      {errors?.frequencyMinutes ? <Text style={styles.inlineErrorText}>Selecciona cada cuanto se toma.</Text> : null}
+      {errors?.frequencyMinutes ? <Text style={styles.inlineErrorText}>Selecciona cada cuánto se toma.</Text> : null}
 
       {customFrequency ? (
         <View style={styles.formRow}>
@@ -4415,11 +4948,11 @@ function MedicationDraftForm({
         </View>
       ) : null}
 
-      <FloatingInput label="Indicaciones extras u observacion" value={draft.instructions} onChangeText={(value) => onChange({ ...draft, instructions: value })} />
+      <FloatingInput label="Indicaciones extras u observación" value={draft.instructions} onChangeText={(value) => onChange({ ...draft, instructions: value })} />
 
       <TimeSelector value={draft.firstTime} onChange={(value) => onChange({ ...draft, firstTime: value })} />
 
-      <FormSectionTitle title="Cuanto medicamento tienes" />
+      <FormSectionTitle title="Cuánto medicamento tienes" />
       <View style={styles.formRow}>
         <View style={styles.formSideField}>
           <FloatingInput label="Frascos/cajas" value={numberInputValue(draft.containerCount)} onChangeText={(value) => onChange({ ...draft, containerCount: Number(sanitizeNumericInput(value)) || 0 })} keyboardType="numeric" error={Boolean(errors?.containerCount)} />
@@ -4428,7 +4961,7 @@ function MedicationDraftForm({
           <FloatingInput label={totalUnitsLabel(draft.unitLabel)} value={numberInputValue(draft.unitsPerContainer)} onChangeText={(value) => onChange({ ...draft, unitsPerContainer: Number(sanitizeNumericInput(value)) || 0 })} keyboardType="numeric" error={Boolean(errors?.unitsPerContainer)} />
         </View>
       </View>
-      {errors?.containerCount || errors?.unitsPerContainer ? <Text style={styles.inlineErrorText}>Completa cuantos frascos o cajas tienes y el total por frasco/caja.</Text> : null}
+      {errors?.containerCount || errors?.unitsPerContainer ? <Text style={styles.inlineErrorText}>Completa cuántos frascos o cajas tienes y el total por frasco/caja.</Text> : null}
     </View>
   );
 }
@@ -4456,6 +4989,7 @@ function ModalShell({
               </Pressable>
             </View>
             <ScrollView
+              nestedScrollEnabled
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="interactive"
@@ -4631,6 +5165,58 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     fontWeight: "800"
+  },
+  biometricPanel: {
+    minHeight: 72,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.mint,
+    borderWidth: 1,
+    borderColor: theme.colors.primary
+  },
+  biometricButton: {
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.primary
+  },
+  savedLoginStack: {
+    gap: 12
+  },
+  savedAccountChips: {
+    gap: 8
+  },
+  savedAccountChip: {
+    minHeight: 38,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.pill,
+    backgroundColor: "#f3eadb",
+    borderWidth: 1,
+    borderColor: theme.colors.line
+  },
+  savedAccountChipActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary
+  },
+  savedAccountChipText: {
+    color: theme.colors.primaryDark,
+    fontWeight: "900"
+  },
+  savedAccountChipTextActive: {
+    color: theme.colors.white
+  },
+  passwordHint: {
+    marginTop: -8,
+    color: theme.colors.primaryDark,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "700"
   },
   topBar: {
     flexDirection: "row",
@@ -5297,6 +5883,24 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8
   },
+  adminRefreshButton: {
+    minHeight: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.line
+  },
+  adminRefreshText: {
+    color: theme.colors.primaryDark,
+    fontSize: 12,
+    fontWeight: "900",
+    textAlign: "center"
+  },
   adminMetric: {
     flexGrow: 1,
     flexBasis: "46%",
@@ -5316,6 +5920,25 @@ const styles = StyleSheet.create({
     color: theme.colors.primaryDark,
     fontSize: 12,
     fontWeight: "800"
+  },
+  adminStatusBox: {
+    gap: 4,
+    padding: 12,
+    borderRadius: theme.radius.sm,
+    backgroundColor: "rgba(255,255,255,0.62)",
+    borderWidth: 1,
+    borderColor: theme.colors.line
+  },
+  adminStatusText: {
+    color: theme.colors.primaryDark,
+    fontSize: 13,
+    fontWeight: "900"
+  },
+  adminFootnote: {
+    color: theme.colors.muted,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "700"
   },
   treatmentPanel: {
     gap: 10,
@@ -5767,10 +6390,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600"
   },
+  floatingInputWithIcon: {
+    paddingRight: 46
+  },
   floatingInputMultiline: {
     minHeight: 110,
     paddingTop: 26,
     textAlignVertical: "top"
+  },
+  passwordToggle: {
+    position: "absolute",
+    right: 10,
+    top: 8,
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 20
   },
   photoActions: {
     flexDirection: "row",
@@ -5931,7 +6567,8 @@ const styles = StyleSheet.create({
     gap: 10
   },
   formRowRaised: {
-    zIndex: 20
+    zIndex: 320,
+    elevation: 36
   },
   formMainField: {
     flex: 2,
@@ -6104,16 +6741,78 @@ const styles = StyleSheet.create({
     color: theme.colors.primaryDark,
     fontWeight: "800"
   },
+  pickerOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 18,
+    backgroundColor: "rgba(8, 14, 13, 0.62)"
+  },
+  pickerSheet: {
+    width: "100%",
+    maxWidth: 420,
+    maxHeight: "72%",
+    gap: 10,
+    padding: 14,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.line
+  },
+  pickerHeader: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10
+  },
+  pickerTitle: {
+    flex: 1,
+    color: theme.colors.ink,
+    fontSize: 20,
+    fontWeight: "900"
+  },
+  pickerScroll: {
+    maxHeight: 360
+  },
+  pickerContent: {
+    gap: 8,
+    paddingBottom: 6
+  },
+  pickerOption: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.sm,
+    backgroundColor: "#f3eadb",
+    borderWidth: 1,
+    borderColor: theme.colors.line
+  },
+  pickerOptionActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary
+  },
+  pickerOptionText: {
+    color: theme.colors.primaryDark,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  pickerOptionTextActive: {
+    color: theme.colors.white
+  },
   dropdownField: {
     width: "100%",
     minHeight: 56,
     position: "relative",
-    zIndex: 70,
-    elevation: 12
+    zIndex: 180,
+    elevation: 20
   },
   dropdownFieldOpen: {
-    zIndex: 140,
-    elevation: 24
+    zIndex: 1000,
+    elevation: 60
   },
   dropdownFieldLabel: {
     position: "absolute",
@@ -6149,8 +6848,8 @@ const styles = StyleSheet.create({
     top: 66,
     left: 0,
     right: 0,
-    zIndex: 160,
-    elevation: 24,
+    zIndex: 1200,
+    elevation: 70,
     maxHeight: 300,
     gap: 8,
     padding: 10,
@@ -6159,6 +6858,9 @@ const styles = StyleSheet.create({
   },
   dropdownScroll: {
     maxHeight: 260
+  },
+  dropdownScrollContent: {
+    paddingBottom: 8
   },
   dropdownOption: {
     minHeight: 36,
@@ -6190,8 +6892,135 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontWeight: "600"
   },
+  timeDisplayButton: {
+    minHeight: 50,
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.white
+  },
+  timeDisplayText: {
+    color: theme.colors.primaryDark,
+    fontSize: 15,
+    fontWeight: "800"
+  },
+  timePickerSheet: {
+    width: "100%",
+    maxWidth: 360,
+    gap: 12,
+    padding: 14,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.line
+  },
+  timeWheel: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.white
+  },
+  timeSeparator: {
+    color: theme.colors.primaryDark,
+    fontSize: 28,
+    fontWeight: "900"
+  },
   timePartLabel: {
     marginBottom: 6,
+    color: theme.colors.primaryDark,
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  timeWheelColumn: {
+    width: 76,
+    gap: 6
+  },
+  timeWheelLabel: {
+    color: theme.colors.primaryDark,
+    fontSize: 12,
+    fontWeight: "800",
+    textAlign: "center"
+  },
+  timeWheelFrame: {
+    height: 154,
+    overflow: "hidden",
+    borderRadius: theme.radius.sm,
+    backgroundColor: "#f8f3eb",
+    borderWidth: 1,
+    borderColor: theme.colors.line
+  },
+  timeWheelScroll: {
+    height: 154
+  },
+  timeWheelContent: {
+    paddingVertical: 54
+  },
+  timeWheelOption: {
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  timeWheelOptionActive: {
+    backgroundColor: theme.colors.mint
+  },
+  timeWheelText: {
+    color: theme.colors.primaryDark,
+    fontSize: 18,
+    fontWeight: "700"
+  },
+  timeWheelTextActive: {
+    color: theme.colors.ink,
+    fontSize: 20,
+    fontWeight: "900"
+  },
+  timeWheelCenterLine: {
+    position: "absolute",
+    top: 59,
+    left: 0,
+    right: 0,
+    height: 36,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "rgba(39, 95, 70, 0.18)"
+  },
+  timeQuickRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8
+  },
+  timeQuickButton: {
+    minHeight: 34,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.mint
+  },
+  timeQuickText: {
+    color: theme.colors.primaryDark,
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  timeClearButton: {
+    minHeight: 34,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.pill,
+    backgroundColor: "#f3eadb",
+    borderWidth: 1,
+    borderColor: theme.colors.line
+  },
+  timeClearText: {
     color: theme.colors.primaryDark,
     fontSize: 12,
     fontWeight: "800"
@@ -6203,9 +7032,19 @@ const styles = StyleSheet.create({
     zIndex: 90,
     elevation: 18
   },
+  compactDropdown: {
+    width: undefined,
+    minWidth: 64,
+    flexGrow: 0,
+    flexShrink: 0
+  },
+  compactDropdownButton: {
+    minHeight: 46,
+    paddingHorizontal: 14
+  },
   ageDropdownOpen: {
-    zIndex: 180,
-    elevation: 30
+    zIndex: 1000,
+    elevation: 60
   },
   ageDropdownPanel: {
     position: "absolute",
@@ -6213,8 +7052,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     maxHeight: 180,
-    zIndex: 200,
-    elevation: 30,
+    zIndex: 1200,
+    elevation: 70,
     padding: 8,
     borderRadius: theme.radius.sm,
     backgroundColor: "#f3eadb",
@@ -6477,4 +7316,5 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.ink
   }
 });
+
 

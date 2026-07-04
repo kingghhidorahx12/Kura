@@ -12,7 +12,20 @@
           "package_name": "com.medimind.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "270375464494-itflgjlas726kf7rs075jc3555532d76.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.medimind.app",
+            "certificate_hash": "6cced5541219b27d2d69b6c3df7a0ac051372192"
+          }
+        },
+        {
+          "client_id": "270375464494-n6366uakae4b71btetq76d357dkmiecr.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCp9XKzBMcuD_V9JVXhQKRmX-jPHGTEz30"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "270375464494-n6366uakae4b71btetq76d357dkmiecr.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

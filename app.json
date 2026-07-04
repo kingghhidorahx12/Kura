@@ -1,8 +1,13 @@
-{
+﻿{
   "expo": {
-    "name": "MediMind",
-    "slug": "medimind",
-    "version": "1.0.1",
+    "name": "Kura",
+    "slug": "kura",
+    "scheme": [
+      "com.medimind.app",
+      "com.googleusercontent.apps.270375464494-itflgjlas726kf7rs075jc3555532d76",
+      "fb1040848148361818"
+    ],
+    "version": "1.0.2",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/medimind-logo-generated.png",
@@ -14,13 +19,13 @@
       "buildNumber": "1",
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "MediMind usa la camara para guardar y escanear la foto de tu receta.",
-        "NSPhotoLibraryUsageDescription": "MediMind usa tu galeria para seleccionar fotos de recetas."
+        "NSCameraUsageDescription": "Kura usa la cámara para guardar y escanear la foto de tu receta.",
+        "NSPhotoLibraryUsageDescription": "Kura usa tu galería para seleccionar fotos de recetas."
       }
     },
     "android": {
       "package": "com.medimind.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/medimind-logo-generated.png",
@@ -32,19 +37,22 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.SCHEDULE_EXACT_ALARM",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.CAMERA",
-        "android.permission.READ_MEDIA_IMAGES",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.POST_NOTIFICATIONS",
-        "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.RECORD_AUDIO"
       ],
       "googleServicesFile": "./google-services.json"
     },
     "plugins": [
       "expo-notifications",
-      "expo-image-picker"
+      "expo-image-picker",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Permite a Kura usar Face ID, huella o biometría para desbloquear tu sesión guardada."
+        }
+      ],
+      "expo-web-browser",
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth"
     ],
     "extra": {
       "eas": {
@@ -59,3 +67,4 @@
     }
   }
 }
+
