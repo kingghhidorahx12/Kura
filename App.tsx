@@ -2836,19 +2836,6 @@ function buildContactText() {
               </View>
             ) : null}
 
-            {false && authMode === "login" && biometricAvailable && storedAuthUser ? (
-              <View style={styles.biometricPanel}>
-                <Fingerprint color={theme.colors.primaryDark} size={24} />
-                <View style={styles.flex}>
-                  <Text style={styles.cardTitle}>Sesión guardada</Text>
-                  <Text style={styles.muted}>Entra como {storedAuthUser.name} con la huella o biometría de este teléfono.</Text>
-                </View>
-                <Pressable style={styles.biometricButton} onPress={() => void unlockWithBiometrics()} disabled={biometricChecking}>
-                  <Text style={styles.primaryButtonText}>{biometricChecking ? "Revisando" : "Entrar"}</Text>
-                </Pressable>
-              </View>
-            ) : null}
-
             {!shouldShowSavedAccountLogin ? <FormSectionTitle title="Datos para iniciar sesión" /> : null}
             {!shouldShowSavedAccountLogin ? (
               <>
