@@ -2728,8 +2728,6 @@ function buildContactText() {
         <AppStatusBar />
         <View style={styles.splashScreen}>
           <KuraLogo size={190} />
-          <Text style={styles.splashTitle}>{APP_NAME}</Text>
-          <Text style={styles.splashTagline}>Tu salud a tiempo</Text>
         </View>
       </SafeAreaView>
     );
@@ -2755,8 +2753,6 @@ function buildContactText() {
         >
           <View style={styles.authBrand}>
             <KuraLogo size={118} />
-            <Text style={styles.authAppName}>{APP_NAME}</Text>
-            <Text style={styles.authTagline}>Tu salud a tiempo</Text>
           </View>
 
           <View style={styles.authPanel}>
@@ -4760,7 +4756,10 @@ function TimeSelector({ value, onChange }: { value: string; onChange: (value: st
           </Pressable>
         ) : null}
       </View>
-      <Text style={styles.timeSelectorHint}>Si la dejas vacía, se usará la hora actual al activar el tratamiento.</Text>
+      <View style={styles.timeStartReminder}>
+        <Clock3 color={theme.colors.primaryDark} size={18} />
+        <Text style={styles.timeStartReminderText}>Si la dejas vacía, se usará la hora actual al activar el tratamiento.</Text>
+      </View>
       <Modal visible={open} animationType="fade" transparent onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.pickerOverlay} onPress={() => setOpen(false)}>
           <Pressable style={styles.timePickerSheet} onPress={(event) => event.stopPropagation()}>
@@ -6889,12 +6888,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.line,
     borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.white
+    backgroundColor: theme.colors.white,
+    justifyContent: "center"
+  },
+  timeStartReminder: {
+    width: "100%",
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    backgroundColor: "#dff3ea"
+  },
+  timeStartReminderText: {
+    flex: 1,
+    color: theme.colors.primaryDark,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: "900"
   },
   timeDisplayText: {
     color: theme.colors.primaryDark,
     fontSize: 15,
-    fontWeight: "800"
+    fontWeight: "800",
+    textAlign: "center"
   },
   timePickerSheet: {
     width: "100%",
@@ -6904,7 +6925,9 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.line
+    borderColor: theme.colors.line,
+    alignItems: "center",
+    justifyContent: "center"
   },
   timeWheel: {
     flexDirection: "row",
@@ -6944,13 +6967,16 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.sm,
     backgroundColor: "#f8f3eb",
     borderWidth: 1,
-    borderColor: theme.colors.line
+    borderColor: theme.colors.line,
+    alignSelf: "center"
   },
   timeWheelScroll: {
-    height: 154
+    height: 154,
+    alignSelf: "center"
   },
   timeWheelContent: {
-    paddingVertical: 54
+    paddingVertical: 54,
+    alignItems: "center"
   },
   timeWheelOption: {
     height: 34,
