@@ -1966,6 +1966,17 @@ export default function App() {
 
     setAuthBusy(true);
     try {
+      const firebaseProfile = await waitForFirebaseAuthReady();
+
+      if (!firebaseProfile) {
+        showNotice(
+          "Sesión de Firebase requerida",
+          "Entraste con huella, pero Firebase no tiene una sesión activa. Inicia sesión una vez con correo y contraseña para conectar otros métodos de acceso.",
+          "warning"
+        );
+        return;
+      }
+
       const linkedProfile =
         provider === "google"
           ? await linkFirebaseGoogleIdToken(await requestGoogleIdToken())
@@ -2008,6 +2019,18 @@ export default function App() {
     setAuthBusy(true);
 
     try {
+      const firebaseProfile = await waitForFirebaseAuthReady();
+
+      if (!firebaseProfile) {
+        showNotice(
+          "Sesión de Firebase requerida",
+          "Entraste con huella, pero Firebase no tiene una sesión activa. Inicia sesión una vez con correo, Google o Facebook y luego conecta tu teléfono.",
+          "warning"
+        );
+        setPhoneLinkNotice("");
+        return;
+      }
+
       setPhoneLinkNotice("Enviando SMS de vinculación...");
       const confirmation = await sendNativePhoneLinkVerification(formattedPhone);
 
