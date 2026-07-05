@@ -1,3 +1,5 @@
+import rnFirestore from "@react-native-firebase/firestore";
+import rnAuth from "@react-native-firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 ﻿import {
   getApp,
@@ -26,6 +28,14 @@ import { collection, doc, getCountFromServer, getDocs, getFirestore, serverTimes
 import { firebaseConfig, hasFirebaseConfig } from "./firebaseConfig";
 
 export type FirebaseAuthProviderName = "email" | "phone" | "google" | "facebook";
+
+type FirebaseUserLike = {
+  uid: string;
+  displayName?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+  providerData?: Array<{ providerId?: string | null }>;
+};
 
 export type FirebaseAuthProfile = {
   id: string;
@@ -71,33 +81,15 @@ function getFirebaseApp(): FirebaseApp | null {
 let firebaseAuthInstance: ReturnType<typeof getAuth> | null = null;
 
 function getFirebaseAuth() {
-  const app = getFirebaseApp();
-  if (!app) {
-    return null;
-  }
-
-  if (firebaseAuthInstance) {
-    return firebaseAuthInstance;
-  }
-
-  try {
-    firebaseAuthInstance = initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage)
-    });
-  } catch {
-    firebaseAuthInstance = getAuth(app);
-  }
-
-  return firebaseAuthInstance;
+  return hasFirebaseConfig() ? rnAuth() : null;
 }
 
 function getFirebaseDb() {
-  const app = getFirebaseApp();
-  return app ? getFirestore(app) : null;
+  return hasFirebaseConfig() ? rnFirestore() : null;
 }
 
-function providerFromFirebaseUser(user: User, fallbackProvider: FirebaseAuthProviderName): FirebaseAuthProviderName {
-  const providerId = user.providerData[0]?.providerId ?? "";
+function providerFromFirebaseUser(user: FirebaseUserLike, fallbackProvider: FirebaseAuthProviderName): FirebaseAuthProviderName {
+  const providerId = user.providerData?.[0]?.providerId ?? "";
   if (providerId.includes("google")) {
     return "google";
   }
@@ -110,7 +102,7 @@ function providerFromFirebaseUser(user: User, fallbackProvider: FirebaseAuthProv
   return fallbackProvider;
 }
 
-function profileFromFirebaseUser(user: User, fallbackProvider: FirebaseAuthProviderName): FirebaseAuthProfile {
+function profileFromFirebaseUser(user: FirebaseUserLike, fallbackProvider: FirebaseAuthProviderName): FirebaseAuthProfile {
   const provider = providerFromFirebaseUser(user, fallbackProvider);
   return {
     id: user.uid,
@@ -146,19 +138,19 @@ export async function syncFirebaseUserRecord(user: FirebaseUserRecordInput) {
     return false;
   }
 
-  await setDoc(
-    doc(db, "users", user.id),
+  await db.collection("users").doc(user.id).set(
     {
       uid: user.id,
       name: user.name,
       identifier: user.identifier,
       provider: user.provider,
       localCreatedAt: user.createdAt,
-      lastLoginAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      lastLoginAt: rnFirestore.FieldValue.serverTimestamp(),
+      updatedAt: rnFirestore.FieldValue.serverTimestamp()
     },
     { merge: true }
   );
+
   return true;
 }
 
@@ -168,15 +160,15 @@ export async function saveFirebaseUsageSnapshot(userId: string, snapshot: Fireba
     return false;
   }
 
-  await setDoc(
-    doc(db, "usageSnapshots", userId),
+  await db.collection("usageSnapshots").doc(userId).set(
     {
       userId,
       ...snapshot,
-      updatedAt: serverTimestamp()
+      updatedAt: rnFirestore.FieldValue.serverTimestamp()
     },
     { merge: true }
   );
+
   return true;
 }
 
@@ -186,13 +178,12 @@ export async function saveFirebaseUserAppState(userId: string, appState: unknown
     return false;
   }
 
-  await setDoc(
-    doc(db, "usageSnapshots", userId),
+  await db.collection("usageSnapshots").doc(userId).set(
     {
       userId,
       appState,
-      appStateUpdatedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      appStateUpdatedAt: rnFirestore.FieldValue.serverTimestamp(),
+      updatedAt: rnFirestore.FieldValue.serverTimestamp()
     },
     { merge: true }
   );
@@ -206,13 +197,13 @@ export async function getFirebaseUserAppState(userId: string) {
     return null;
   }
 
-  const snapshot = await getDoc(doc(db, "usageSnapshots", userId));
-  if (!snapshot.exists()) {
+  const snapshot = await db.collection("usageSnapshots").doc(userId).get();
+  if (!snapshot.exists) {
     return null;
   }
 
-  const data = snapshot.data() as { appState?: unknown };
-  return data.appState ?? null;
+  const data = snapshot.data() as { appState?: unknown } | undefined;
+  return data?.appState ?? null;
 }
 
 export async function getFirebaseAdminStats(): Promise<FirebaseAdminStats | null> {
@@ -221,10 +212,9 @@ export async function getFirebaseAdminStats(): Promise<FirebaseAdminStats | null
     return null;
   }
 
-  const [users, usageSnapshots, usageSnapshotDocs] = await Promise.all([
-    getCountFromServer(collection(db, "users")),
-    getCountFromServer(collection(db, "usageSnapshots")),
-    getDocs(collection(db, "usageSnapshots"))
+  const [usersSnapshot, usageSnapshotDocs] = await Promise.all([
+    db.collection("users").get(),
+    db.collection("usageSnapshots").get()
   ]);
 
   const totals = {
@@ -265,8 +255,8 @@ export async function getFirebaseAdminStats(): Promise<FirebaseAdminStats | null
   });
 
   return {
-    userCount: users.data().count,
-    usageSnapshotCount: usageSnapshots.data().count,
+    userCount: typeof usersSnapshot.size === "number" ? usersSnapshot.size : 0,
+    usageSnapshotCount: typeof usageSnapshotDocs.size === "number" ? usageSnapshotDocs.size : 0,
     ...totals
   };
 }
@@ -278,17 +268,10 @@ export async function waitForFirebaseAuthReady() {
   }
 
   await new Promise<void>((resolve) => {
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      () => {
-        unsubscribe();
-        resolve();
-      },
-      () => {
-        unsubscribe();
-        resolve();
-      }
-    );
+    const unsubscribe = auth.onAuthStateChanged(() => {
+      unsubscribe();
+      resolve();
+    });
   });
 
   return auth.currentUser ? profileFromFirebaseUser(auth.currentUser, "email") : null;
@@ -300,7 +283,7 @@ export async function signInWithFirebaseEmail(email: string, password: string) {
     return null;
   }
 
-  const result = await signInWithEmailAndPassword(auth, email, password);
+  const result = await auth.signInWithEmailAndPassword(email, password);
   return profileFromFirebaseUser(result.user, "email");
 }
 
@@ -310,10 +293,11 @@ export async function createFirebaseEmailUser(email: string, password: string, n
     return null;
   }
 
-  const result = await createUserWithEmailAndPassword(auth, email, password);
+  const result = await auth.createUserWithEmailAndPassword(email, password);
   if (name.trim()) {
-    await updateProfile(result.user, { displayName: name.trim() });
+    await result.user.updateProfile({ displayName: name.trim() });
   }
+
   return profileFromFirebaseUser(result.user, "email");
 }
 
@@ -323,19 +307,12 @@ export async function sendFirebasePasswordReset(email: string) {
     return false;
   }
 
-  await sendPasswordResetEmail(auth, email);
+  await auth.sendPasswordResetEmail(email);
   return true;
 }
 
 export async function signInWithFirebaseSocial(providerName: "google" | "facebook") {
-  const auth = getFirebaseAuth();
-  if (!auth) {
-    return null;
-  }
-
-  const provider = providerName === "google" ? new GoogleAuthProvider() : new FacebookAuthProvider();
-  const result = await signInWithPopup(auth, provider);
-  return profileFromFirebaseUser(result.user, providerName);
+  return null;
 }
 
 export async function signInWithFirebaseGoogleIdToken(idToken: string) {
@@ -344,8 +321,8 @@ export async function signInWithFirebaseGoogleIdToken(idToken: string) {
     return null;
   }
 
-  const credential = GoogleAuthProvider.credential(idToken);
-  const result = await signInWithCredential(auth, credential);
+  const credential = rnAuth.GoogleAuthProvider.credential(idToken);
+  const result = await auth.signInWithCredential(credential);
   return profileFromFirebaseUser(result.user, "google");
 }
 
@@ -355,30 +332,30 @@ export async function signInWithFirebaseFacebookAccessToken(accessToken: string)
     return null;
   }
 
-  const credential = FacebookAuthProvider.credential(accessToken);
-  const result = await signInWithCredential(auth, credential);
+  const credential = rnAuth.FacebookAuthProvider.credential(accessToken);
+  const result = await auth.signInWithCredential(credential);
   return profileFromFirebaseUser(result.user, "facebook");
 }
 
 export async function linkFirebaseGoogleIdToken(idToken: string) {
   const auth = getFirebaseAuth();
   if (!auth?.currentUser) {
-    throw new Error("Primero inicia sesión con tu cuenta de correo para conectar Google.");
+    throw new Error("Primero inicia sesión para conectar Google.");
   }
 
-  const credential = GoogleAuthProvider.credential(idToken);
-  const result = await linkWithCredential(auth.currentUser, credential);
+  const credential = rnAuth.GoogleAuthProvider.credential(idToken);
+  const result = await auth.currentUser.linkWithCredential(credential);
   return profileFromFirebaseUser(result.user, "google");
 }
 
 export async function linkFirebaseFacebookAccessToken(accessToken: string) {
   const auth = getFirebaseAuth();
   if (!auth?.currentUser) {
-    throw new Error("Primero inicia sesión con tu cuenta de correo para conectar Facebook.");
+    throw new Error("Primero inicia sesión para conectar Facebook.");
   }
 
-  const credential = FacebookAuthProvider.credential(accessToken);
-  const result = await linkWithCredential(auth.currentUser, credential);
+  const credential = rnAuth.FacebookAuthProvider.credential(accessToken);
+  const result = await auth.currentUser.linkWithCredential(credential);
   return profileFromFirebaseUser(result.user, "facebook");
 }
 
@@ -388,7 +365,7 @@ export async function signOutFromFirebase() {
     return;
   }
 
-  await signOut(auth);
+  await auth.signOut();
 }
 
 export { hasFirebaseConfig };

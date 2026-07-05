@@ -55,3 +55,33 @@ export async function confirmNativePhoneVerification(confirmation: NativePhoneCo
   };
 }
 
+export async function sendNativePhoneLinkVerification(phoneNumber: string): Promise<NativePhoneConfirmation | null> {
+  if (Platform.OS === "web") {
+    return null;
+  }
+
+  const authModule = await import("@react-native-firebase/auth");
+  const auth = authModule.getAuth();
+  const currentUser = auth.currentUser as unknown as {
+    linkWithPhoneNumber?: (phoneNumber: string) => Promise<NativePhoneConfirmation>;
+  } | null;
+
+  if (!currentUser) {
+    throw new Error("Primero inicia sesión para conectar un teléfono.");
+  }
+
+  if (typeof currentUser.linkWithPhoneNumber !== "function") {
+    throw new Error("Esta versión nativa no expone linkWithPhoneNumber. Lo resolvemos con APK nativa y verificación de teléfono.");
+  }
+
+  return currentUser.linkWithPhoneNumber(phoneNumber);
+}
+
+export async function confirmNativePhoneLinkVerification(
+  confirmation: NativePhoneConfirmation,
+  code: string,
+  fallbackName?: string
+): Promise<FirebaseAuthProfile> {
+  return confirmNativePhoneVerification(confirmation, code, fallbackName);
+}
+
