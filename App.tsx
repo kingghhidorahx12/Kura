@@ -3759,7 +3759,7 @@ function buildContactText() {
 
               {phoneLinkNotice ? <Text style={styles.accountAccessText}>{phoneLinkNotice}</Text> : null}
             </View>
-          </View>
+          </View> 
 
           <Pressable style={styles.secondaryButton} onPress={() => void signOut()}>
             <Text style={styles.secondaryButtonText}>Bloquear sesión</Text>
@@ -5400,6 +5400,8 @@ function createStyles(theme: KuraTheme) {
   const mutedOnCurrentSurface = surfaceIsDark ? mutedOnDarkSurface : mutedOnLightSurface;
 
   const textOnPrimary = theme.colors.white;
+  const textOnSoftAction = theme.key === "night" ? textOnDarkSurface : textOnLightSurface;
+  const textOnThemeOptionSelected = theme.key === "night" ? textOnDarkSurface : textOnLightSurface;
 
   const canvasTitleColor = textOnCanvas;
   const canvasSubtitleColor = mutedOnCanvas;
@@ -6316,7 +6318,7 @@ function createStyles(theme: KuraTheme) {
     borderColor: theme.colors.line
   },
   accountAccessButtonText: {
-    color: darkSurfaceTextColor,
+    color: textOnSoftAction,
     fontSize: 12,
     fontWeight: "900",
     textAlign: "center"
@@ -6380,7 +6382,7 @@ function createStyles(theme: KuraTheme) {
     textAlign: "center"
   },
   themeOptionTextActive: {
-    color: textOnCurrentSurface
+    color: textOnThemeOptionSelected
   },
   themeActiveBadge: {
     overflow: "hidden",
@@ -7013,7 +7015,7 @@ function createStyles(theme: KuraTheme) {
     backgroundColor: theme.colors.mint
   },
   secondaryButtonText: {
-    color: darkSurfaceTextColor,
+    color: textOnSoftAction,
     fontWeight: "900",
     fontSize: 14,
     textAlign: "center",
