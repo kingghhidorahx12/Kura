@@ -77,8 +77,9 @@ import {
   signInWithFirebaseEmail,
   signInWithFirebaseFacebookAccessToken,
   signInWithFirebaseGoogleIdToken,
-  signInWithFirebaseSocial,
-  signOutFromFirebase,
+  linkFirebaseFacebookAccessToken,
+  linkFirebaseGoogleIdToken,
+  signInWithFirebaseSocial,
   syncFirebaseUserRecord,
   type FirebaseAdminStats,
   type FirebaseAuthProfile
@@ -1894,6 +1895,45 @@ export default function App() {
     showNotice("No se pudo iniciar sesión", "Firebase no devolvió usuario para este proveedor.", "danger");
   }
 
+  async function connectSocialProvider(provider: "google" | "facebook") {
+    if (!authUser) {
+      showNotice("Primero inicia sesión", "Entra con tu correo y contraseña para conectar otros métodos de acceso.", "warning");
+      return;
+    }
+
+    if (!hasFirebaseConfig()) {
+      showNotice("Firebase no configurado", "Conecta Firebase para vincular métodos de acceso.", "warning");
+      return;
+    }
+
+    if (authBusy) {
+      return;
+    }
+
+    setAuthBusy(true);
+    try {
+      const linkedProfile =
+        provider === "google"
+          ? await linkFirebaseGoogleIdToken(await requestGoogleIdToken())
+          : await linkFirebaseFacebookAccessToken(await requestFacebookAccessToken());
+
+      if (linkedProfile) {
+        await syncFirebaseUserRecord(authUser);
+      }
+
+      showNotice(
+        provider === "google" ? "Google conectado" : "Facebook conectado",
+        `Ahora puedes entrar a esta misma cuenta usando ${provider === "google" ? "Google" : "Facebook"}.`,
+        "success"
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : firebaseErrorMessage(error);
+      showNotice(provider === "google" ? "No se pudo conectar Google" : "No se pudo conectar Facebook", message, "warning");
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
   function markActivity() {
     lastActivityAtRef.current = Date.now();
   }
@@ -1906,7 +1946,7 @@ export default function App() {
     lockingSessionRef.current = true;
     const currentUser = authUser;
     try {
-      await signOutFromFirebase();
+      // Bloqueo local: conserva Firebase activo para que la huella reactive panel/sync.
       await rememberDeviceAccount(currentUser);
       await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(currentUser));
       setStoredAuthUser(currentUser);
@@ -1929,7 +1969,7 @@ export default function App() {
 
   async function signOut() {
     const currentUser = authUser;
-    await signOutFromFirebase();
+      // Bloqueo local: conserva Firebase activo para que la huella reactive panel/sync.
     if (currentUser) {
       await rememberDeviceAccount(currentUser);
       await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(currentUser));
@@ -3504,6 +3544,8 @@ function buildContactText() {
 
         {renderAdminPanel()}
 
+        {renderThemeSelector()}
+
         <View style={styles.accountPanel}>
           <View style={styles.nextHeader}>
             <UserRound color={theme.colors.primaryDark} size={21} />
@@ -3512,6 +3554,29 @@ function buildContactText() {
               <Text style={styles.muted}>{authUser?.name ?? "Usuario Kura"} - {authUser?.identifier ?? "Sesión local"}</Text>
             </View>
           </View>
+          <View style={styles.accountAccessPanel}>
+            <Text style={styles.accountAccessTitle}>Métodos de acceso</Text>
+            <Text style={styles.accountAccessText}>Conecta Google o Facebook para entrar a esta misma cuenta.</Text>
+
+            <View style={styles.accountAccessButtons}>
+              <Pressable
+                disabled={authBusy}
+                style={[styles.accountAccessButton, authBusy && styles.disabledButton]}
+                onPress={() => void connectSocialProvider("google")}
+              >
+                <Text style={styles.accountAccessButtonText}>Conectar Google</Text>
+              </Pressable>
+
+              <Pressable
+                disabled={authBusy}
+                style={[styles.accountAccessButton, authBusy && styles.disabledButton]}
+                onPress={() => void connectSocialProvider("facebook")}
+              >
+                <Text style={styles.accountAccessButtonText}>Conectar Facebook</Text>
+              </Pressable>
+            </View>
+          </View>
+
           <Pressable style={styles.secondaryButton} onPress={() => void signOut()}>
             <Text style={styles.secondaryButtonText}>Bloquear sesión</Text>
           </Pressable>
