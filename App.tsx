@@ -1707,6 +1707,30 @@ export default function App() {
       });
 
       if (result.success) {
+        if (hasFirebaseConfig()) {
+          const firebaseProfile = await waitForFirebaseAuthReady();
+
+          if (firebaseProfile) {
+            const sameAccount =
+              firebaseProfile.id === account.id ||
+              firebaseProfile.identifier.toLowerCase() === account.identifier.toLowerCase();
+
+            if (sameAccount) {
+              await saveAuthUser(buildAuthUserFromFirebase(firebaseProfile));
+              setAuthNotice("");
+              resetAuthForm("login");
+              return;
+            }
+          }
+
+          setAuthNotice(
+            "Por seguridad, vuelve a entrar una vez con contraseña para reconectar Firebase. Después podrás usar huella de nuevo."
+          );
+          setUseManualAuthForm(true);
+          setAuthSecret("");
+          return;
+        }
+
         await saveAuthUser(account);
         setAuthNotice("");
         resetAuthForm("login");
