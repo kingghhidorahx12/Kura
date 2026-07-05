@@ -4735,7 +4735,7 @@ function TimeSelector({ value, onChange }: { value: string; onChange: (value: st
   }
 
   return (
-    <Field label="Hora de inicio (opcional)">
+    <Field label="Programa la hora para iniciar el tratamiento:">
       <Pressable
         style={styles.timeDisplayButton}
         onPress={() => {
@@ -4745,7 +4745,6 @@ function TimeSelector({ value, onChange }: { value: string; onChange: (value: st
           setOpen(true);
         }}
       >
-        <Clock3 color={theme.colors.primaryDark} size={18} />
         <Text style={[styles.timeDisplayText, !value && styles.dropdownPlaceholderText]}>{value ? normalizeTimeValue(value) : "Elegir hora"}</Text>
       </Pressable>
       <View style={styles.timeQuickRow}>
@@ -6911,17 +6910,24 @@ const styles = StyleSheet.create({
     fontWeight: "600"
   },
   timeDisplayButton: {
-    minHeight: 50,
-    alignSelf: "flex-start",
+    minHeight: 68,
+    alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: theme.colors.line,
-    borderRadius: theme.radius.sm,
-    backgroundColor: theme.colors.white,
-    justifyContent: "center"
+    paddingHorizontal: 24,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
+    borderRadius: theme.radius.lg,
+    backgroundColor: "#dff3ea",
+    justifyContent: "center",
+    minWidth: 178,
+    paddingVertical: 10,
+    shadowColor: "#275f46",
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3
   },
   timeStartReminder: {
     width: "100%",
@@ -6932,22 +6938,27 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: theme.radius.md,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: theme.colors.primary,
-    backgroundColor: "#dff3ea"
+    backgroundColor: "#dff3ea",
+    alignSelf: "center",
+    maxWidth: 520,
+    justifyContent: "center"
   },
   timeStartReminderText: {
     flex: 1,
     color: theme.colors.primaryDark,
     fontSize: 13,
     lineHeight: 18,
-    fontWeight: "900"
+    fontWeight: "900",
+    textAlign: "center"
   },
   timeDisplayText: {
     color: theme.colors.primaryDark,
-    fontSize: 15,
-    fontWeight: "800",
-    textAlign: "center"
+    fontSize: 24,
+    fontWeight: "900",
+    textAlign: "center",
+    lineHeight: 30
   },
   timePickerSheet: {
     width: "100%",
@@ -7117,7 +7128,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginTop: 8
+    marginTop: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "center"
   },
   timeQuickButton: {
     minHeight: 34,
