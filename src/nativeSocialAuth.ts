@@ -16,7 +16,36 @@ const facebookNativeRedirectUri = AuthSession.makeRedirectUri({
 });
 
 export async function requestGoogleIdToken() {
-  const clientId = Platform.OS === "web" ? googleOAuthConfig.webClientId : googleOAuthConfig.androidClientId;
+  if (Platform.OS !== "web") {
+    if (!googleOAuthConfig.webClientId) {
+      throw new Error(missingGoogleOAuthMessage());
+    }
+
+    const { GoogleSignin } = await import("@react-native-google-signin/google-signin");
+
+    GoogleSignin.configure({
+      webClientId: googleOAuthConfig.webClientId,
+      offlineAccess: false
+    });
+
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+
+    const result = await GoogleSignin.signIn();
+    const rawResult = result as unknown as {
+      idToken?: string | null;
+      data?: { idToken?: string | null } | null;
+    };
+
+    const idToken = rawResult.data?.idToken ?? rawResult.idToken;
+
+    if (!idToken) {
+      throw new Error("Google no devolvió un ID token.");
+    }
+
+    return idToken;
+  }
+
+  const clientId = googleOAuthConfig.webClientId;
   if (!clientId) {
     throw new Error(missingGoogleOAuthMessage());
   }
@@ -33,6 +62,7 @@ export async function requestGoogleIdToken() {
   });
 
   const result = await request.promptAsync(googleDiscovery);
+
   if (result.type !== "success" || !result.params.code) {
     throw new Error("Inicio con Google cancelado.");
   }
@@ -58,6 +88,7 @@ export async function requestGoogleIdToken() {
 
 export async function requestFacebookAccessToken() {
   const clientId = facebookOAuthConfig.appId;
+
   if (!clientId) {
     throw new Error(missingFacebookOAuthMessage());
   }
@@ -70,6 +101,7 @@ export async function requestFacebookAccessToken() {
   });
 
   const result = await request.promptAsync(facebookDiscovery);
+
   if (result.type !== "success" || !result.params.access_token) {
     throw new Error("Inicio con Facebook cancelado.");
   }

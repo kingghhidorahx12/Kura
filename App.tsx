@@ -908,6 +908,7 @@ export default function App() {
   const [storedAuthUser, setStoredAuthUser] = useState<AuthUser | null>(null);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricChecking, setBiometricChecking] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [authMethod, setAuthMethod] = useState<AuthMethod>("email");
   const [authName, setAuthName] = useState("");
@@ -1548,19 +1549,47 @@ export default function App() {
   }
 
   function firebaseErrorMessage(error: unknown) {
-    const message = error instanceof Error ? error.message : "";
-    if (message.includes("auth/invalid-credential") || message.includes("auth/wrong-password")) {
-      return "Los datos de inicio de sesión no coinciden.";
+    const firebaseError = error as { code?: string; message?: string };
+    const code = firebaseError?.code ?? "";
+    const message = firebaseError?.message ?? "";
+
+    if (
+      code.includes("auth/invalid-credential") ||
+      code.includes("auth/wrong-password") ||
+      code.includes("auth/user-not-found") ||
+      message.includes("INVALID_LOGIN_CREDENTIALS")
+    ) {
+      return "Correo o contraseña incorrectos.";
     }
-    if (message.includes("auth/email-already-in-use")) {
-      return "Ese correo ya tiene una cuenta.";
+
+    if (code.includes("auth/invalid-email")) {
+      return "El correo no tiene un formato válido.";
     }
-    if (message.includes("auth/weak-password")) {
-      return "Usa una contraseña de al menos 6 caracteres.";
+
+    if (code.includes("auth/email-already-in-use")) {
+      return "Ese correo ya tiene una cuenta. Intenta iniciar sesión.";
     }
-    if (message.includes("auth/popup")) {
-      return "No se pudo abrir la ventana de inicio de sesión.";
+
+    if (code.includes("auth/weak-password")) {
+      return "La contraseña debe tener al menos 6 caracteres.";
     }
+
+    if (code.includes("auth/too-many-requests")) {
+      return "Hubo demasiados intentos. Espera un momento y vuelve a probar.";
+    }
+
+    if (code.includes("auth/account-exists-with-different-credential")) {
+      return "Ese correo ya existe con otro método. Entra con tu correo y contraseña, luego conecta Google o Facebook desde Cuenta.";
+    }
+
+    if (code.includes("auth/credential-already-in-use")) {
+      return "Ese método ya está conectado a otra cuenta.";
+    }
+
+    if (message) {
+      return message;
+    }
+
     return "Firebase no pudo completar la operación. Revisa la configuración del proyecto.";
   }
 
@@ -1638,6 +1667,19 @@ export default function App() {
   }
 
   async function loginSavedAccountWithPassword() {
+    if (authBusy) {
+      return;
+    }
+
+    setAuthBusy(true);
+    try {
+      await loginSavedAccountWithPasswordCore();
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function loginSavedAccountWithPasswordCore() {
     const account = selectedDeviceAccount;
     const secret = authSecret.trim();
 
@@ -1679,6 +1721,19 @@ export default function App() {
   }
 
   async function handleAuthSubmit() {
+    if (authBusy) {
+      return;
+    }
+
+    setAuthBusy(true);
+    try {
+      await handleAuthSubmitCore();
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function handleAuthSubmitCore() {
     const identifier = authIdentifier.trim();
     const secret = authSecret.trim();
 
@@ -2800,7 +2855,8 @@ function buildContactText() {
                 {selectedDeviceAccount.provider === "email" ? (
                   <>
                     <FloatingInput label="Contraseña" value={authSecret} onChangeText={setAuthSecret} secureTextEntry />
-                    <Pressable style={styles.secondaryButton} onPress={() => void loginSavedAccountWithPassword()}>
+                    <Pressable style={styles.secondaryButton} disabled={authBusy}
+                onPress={() => void loginSavedAccountWithPassword()}>
                       <Text style={styles.secondaryButtonText}>Entrar con contraseña</Text>
                     </Pressable>
                   </>
@@ -3457,7 +3513,7 @@ function buildContactText() {
             </View>
           </View>
           <Pressable style={styles.secondaryButton} onPress={() => void signOut()}>
-            <Text style={styles.secondaryButtonText}>Cerrar sesión</Text>
+            <Text style={styles.secondaryButtonText}>Bloquear sesión</Text>
           </Pressable>
         </View>
       </View>
@@ -5926,6 +5982,47 @@ function createStyles(theme: KuraTheme) {
   profileActions: {
     gap: 8
   },
+  accountAccessPanel: {
+    gap: 8,
+    padding: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.colors.line
+  },
+  accountAccessTitle: {
+    color: theme.colors.ink,
+    fontSize: 15,
+    fontWeight: "900"
+  },
+  accountAccessText: {
+    color: theme.colors.muted,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "700"
+  },
+  accountAccessButtons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8
+  },
+  accountAccessButton: {
+    flexGrow: 1,
+    minHeight: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.mint,
+    borderWidth: 1,
+    borderColor: theme.colors.line
+  },
+  accountAccessButtonText: {
+    color: theme.colors.primaryDark,
+    fontSize: 12,
+    fontWeight: "900",
+    textAlign: "center"
+  },
   accountPanel: {
     gap: 12,
     padding: 14,
@@ -6569,6 +6666,9 @@ function createStyles(theme: KuraTheme) {
     height: 180,
     borderRadius: theme.radius.sm,
     backgroundColor: theme.colors.backgroundSoft
+  },
+  disabledButton: {
+    opacity: 0.68
   },
   primaryButton: {
     minHeight: 50,
