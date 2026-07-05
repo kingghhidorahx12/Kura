@@ -5240,10 +5240,13 @@ function ModalShell({
 
 function createStyles(theme: KuraTheme) {
   const isDarkCanvas = theme.key === "classic" || theme.key === "night";
-  const canvasTitleColor = isDarkCanvas ? theme.colors.white : theme.colors.ink;
-  const canvasSubtitleColor = isDarkCanvas ? theme.colors.mint : theme.colors.primaryDark;
+  const canvasTitleColor = theme.key === "night" ? "#6d987d" : isDarkCanvas ? theme.colors.white : theme.colors.ink;
+  const canvasSubtitleColor = theme.key === "night" ? "#c8d9d0" : isDarkCanvas ? theme.colors.mint : theme.colors.primaryDark;
   const lightSurfaceTextColor = theme.key === "night" ? "#25342f" : theme.colors.primaryDark;
   const lightSurfaceMutedColor = theme.key === "night" ? "#5a6d64" : theme.colors.softText;
+  const darkSurfaceTextColor = theme.key === "night" ? "#f2fbf6" : theme.colors.ink;
+  const darkSurfaceMutedColor = theme.key === "night" ? "#d2e2d9" : theme.colors.muted;
+  const darkSurfaceSoftColor = theme.key === "night" ? "#adc1b6" : theme.colors.softText;
 
   return StyleSheet.create({
   safe: {
@@ -5592,7 +5595,7 @@ function createStyles(theme: KuraTheme) {
   profileTitle: {
     fontSize: 34,
     fontWeight: "900",
-    color: canvasSubtitleColor,
+    color: canvasTitleColor,
     letterSpacing: 0
   },
   centeredTitle: {
@@ -5625,7 +5628,7 @@ function createStyles(theme: KuraTheme) {
     backgroundColor: theme.colors.peach
   },
   addProfileButtonText: {
-    color: theme.colors.primaryDark,
+    color: lightSurfaceTextColor,
     fontWeight: "900",
     textAlign: "center"
   },
@@ -5697,7 +5700,7 @@ function createStyles(theme: KuraTheme) {
   muted: {
     fontSize: 14,
     lineHeight: 20,
-    color: theme.colors.primaryDark
+    color: canvasSubtitleColor
   },
   softText: {
     fontSize: 13,
@@ -5781,7 +5784,8 @@ function createStyles(theme: KuraTheme) {
   sectionTitle: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between"
+    justifyContent: "space-between",
+    color: canvasTitleColor
   },
   sectionTitleText: {
     fontSize: 18,
@@ -5848,7 +5852,7 @@ function createStyles(theme: KuraTheme) {
   cardTitle: {
     fontSize: 16,
     fontWeight: "900",
-    color: theme.colors.ink
+    color: darkSurfaceTextColor
   },
   rowBetween: {
     flexDirection: "row",
@@ -6081,7 +6085,7 @@ function createStyles(theme: KuraTheme) {
   profileName: {
     fontSize: 20,
     fontWeight: "900",
-    color: theme.colors.ink
+    color: darkSurfaceTextColor
   },
   iconSoftButton: {
     width: 40,
@@ -6111,12 +6115,12 @@ function createStyles(theme: KuraTheme) {
     borderColor: theme.colors.line
   },
   accountAccessTitle: {
-    color: theme.colors.ink,
+    color: darkSurfaceTextColor,
     fontSize: 15,
     fontWeight: "900"
   },
   accountAccessText: {
-    color: theme.colors.muted,
+    color: darkSurfaceMutedColor,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: "700"
@@ -6138,7 +6142,7 @@ function createStyles(theme: KuraTheme) {
     borderColor: theme.colors.line
   },
   accountAccessButtonText: {
-    color: lightSurfaceTextColor,
+    color: darkSurfaceTextColor,
     fontSize: 12,
     fontWeight: "900",
     textAlign: "center"
@@ -6202,7 +6206,7 @@ function createStyles(theme: KuraTheme) {
     textAlign: "center"
   },
   themeOptionTextActive: {
-    color: theme.colors.ink
+    color: theme.colors.white
   },
   themeActiveBadge: {
     overflow: "hidden",
@@ -6835,7 +6839,7 @@ function createStyles(theme: KuraTheme) {
     backgroundColor: theme.colors.mint
   },
   secondaryButtonText: {
-    color: lightSurfaceTextColor,
+    color: darkSurfaceTextColor,
     fontWeight: "900",
     fontSize: 14,
     textAlign: "center",
