@@ -3880,11 +3880,11 @@ function buildContactText() {
 
             <View style={styles.photoActions}>
               <Pressable style={styles.optionButton} onPress={() => void pickRecipePhoto("camera")}>
-                <Camera color={theme.colors.primaryDark} size={21} />
+                <Camera color={theme.key === "night" ? "#25342f" : theme.colors.primaryDark} size={21} />
                 <Text style={styles.optionText}>Tomar foto</Text>
               </Pressable>
               <Pressable style={styles.optionButton} onPress={() => void pickRecipePhoto("library")}>
-                <FileText color={theme.colors.primaryDark} size={21} />
+                <FileText color={theme.key === "night" ? "#25342f" : theme.colors.primaryDark} size={21} />
                 <Text style={styles.optionText}>Galeria</Text>
               </Pressable>
             </View>
@@ -4264,7 +4264,7 @@ function RecipeWizardSteps({ current, onSelect }: { current: RecipeStep; onSelec
         return (
           <Pressable key={step.key} style={[styles.stepPill, active && styles.stepPillActive]} onPress={() => onSelect(step.key)}>
             <Text style={[styles.stepPillStepText, active && styles.stepPillTextActive]}>{step.stepLabel}</Text>
-            <Text style={[styles.stepPillText, active && styles.stepPillTextActive]}>{step.label}</Text>
+            <Text style={[styles.stepPillText, { color: active ? theme.colors.white : (theme.key === "night" ? "#25342f" : theme.colors.primaryDark) }, active && styles.stepPillTextActive]}>{step.label}</Text>
           </Pressable>
         );
       })}
@@ -5242,6 +5242,8 @@ function createStyles(theme: KuraTheme) {
   const isDarkCanvas = theme.key === "classic" || theme.key === "night";
   const canvasTitleColor = isDarkCanvas ? theme.colors.white : theme.colors.ink;
   const canvasSubtitleColor = isDarkCanvas ? theme.colors.mint : theme.colors.primaryDark;
+  const lightSurfaceTextColor = theme.key === "night" ? "#25342f" : theme.colors.primaryDark;
+  const lightSurfaceMutedColor = theme.key === "night" ? "#5a6d64" : theme.colors.softText;
 
   return StyleSheet.create({
   safe: {
@@ -6713,7 +6715,7 @@ function createStyles(theme: KuraTheme) {
     top: 17,
     maxHeight: 18,
     overflow: "hidden",
-    color: theme.colors.primaryDark,
+    color: lightSurfaceTextColor,
     fontSize: 15,
     lineHeight: 18,
     fontWeight: "500",
@@ -6777,7 +6779,7 @@ function createStyles(theme: KuraTheme) {
     fontSize: 12,
     fontWeight: "900",
     textAlign: "center",
-    color: theme.colors.primaryDark
+    color: lightSurfaceTextColor
   },
   modalImage: {
     width: "100%",
@@ -6891,7 +6893,7 @@ function createStyles(theme: KuraTheme) {
   stepPillText: {
     fontSize: 12,
     fontWeight: "900",
-    color: theme.colors.primaryDark,
+    color: lightSurfaceTextColor,
     textAlign: "center"
   },
   stepPillStepText: {
@@ -7178,7 +7180,7 @@ function createStyles(theme: KuraTheme) {
     backgroundColor: theme.colors.white
   },
   dropdownText: {
-    color: theme.colors.primaryDark,
+    color: lightSurfaceTextColor,
     fontWeight: "600",
     fontSize: 14,
     lineHeight: 17,
