@@ -33,3 +33,89 @@ export const theme = {
     xl: 28
   }
 };
+
+export type KuraThemeKey = "classic" | "light" | "natural" | "night";
+export type KuraLogoVariant = "white" | "dark";
+
+export type KuraTheme = typeof theme & {
+  key: KuraThemeKey;
+  label: string;
+  logoVariant: KuraLogoVariant;
+};
+
+export const DEFAULT_KURA_THEME_KEY: KuraThemeKey = "classic";
+
+export const appThemes: Record<KuraThemeKey, KuraTheme> = {
+  classic: {
+    ...theme,
+    key: "classic",
+    label: "Clásico",
+    logoVariant: "white",
+    colors: {
+      ...theme.colors
+    }
+  },
+  light: {
+    ...theme,
+    key: "light",
+    label: "Claro",
+    logoVariant: "dark",
+    colors: {
+      ...theme.colors,
+      ink: "#24312f",
+      muted: "#67736f",
+      softText: "#87908d",
+      background: "#fffaf0",
+      backgroundSoft: "#edf5e9",
+      surface: "#ffffff",
+      surfaceAlt: "#edf5e9",
+      line: "#d9cfbd",
+      primary: "#4f8b67",
+      primaryDark: "#2f6246",
+      mint: "#d9eddf",
+      white: "#ffffff"
+    }
+  },
+  natural: {
+    ...theme,
+    key: "natural",
+    label: "Natural",
+    logoVariant: "dark",
+    colors: {
+      ...theme.colors,
+      ink: "#24312f",
+      muted: "#64736b",
+      softText: "#819088",
+      background: "#edf5e9",
+      backgroundSoft: "#d9eddf",
+      surface: "#fffaf0",
+      surfaceAlt: "#ffffff",
+      line: "#cbd9c8",
+      primary: "#4f8b67",
+      primaryDark: "#2f6246",
+      mint: "#d9eddf",
+      white: "#ffffff"
+    }
+  },
+  night: {
+    ...theme,
+    key: "night",
+    label: "Noche",
+    logoVariant: "white",
+    colors: {
+      ...theme.colors,
+      ink: "#eff8f2",
+      muted: "#c5d1cc",
+      softText: "#a8b6b0",
+      background: "#0f1715",
+      backgroundSoft: "#17211f",
+      surface: "#1d2b27",
+      surfaceAlt: "#243631",
+      line: "#345046",
+      primary: "#54b683",
+      primaryDark: "#d9eddf",
+      mint: "#254237",
+      white: "#ffffff"
+    }
+  }
+};

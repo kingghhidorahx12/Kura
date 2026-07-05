@@ -62,9 +62,11 @@ import {
 } from "react-native";
 import Svg, { Circle, Path } from "react-native-svg";
 import { buildDoseEvents, formatFrequency, formatShortDate, formatTime, getStockLevel, getStockPercent, suggestTimes, todayDateKey } from "./src/schedule";
-import { theme } from "./src/theme";
+import { DEFAULT_KURA_THEME_KEY, appThemes, type KuraTheme, type KuraThemeKey } from "./src/theme";
 import { DoseEvent, DoseStatus, Medication, NewMedicationDraft, Profile, ProfileIcon, Recipe, TabKey } from "./src/types";
 import { KuraLogo } from "./src/KuraLogo";
+
+let theme: KuraTheme = appThemes[DEFAULT_KURA_THEME_KEY];
 import { confirmNativePhoneVerification, formatPhoneForFirebase, sendNativePhoneVerification, type NativePhoneConfirmation } from "./src/nativePhoneAuth";
 import {
   createFirebaseEmailUser,
@@ -197,6 +199,7 @@ const STORAGE_KEY_PREFIX = "medimind-state-v1";
 const AUTH_STORAGE_KEY = "medimind-auth-v1";
 const DEVICE_ACCOUNTS_STORAGE_KEY = "medimind-device-accounts-v1";
 const USERS_STORAGE_KEY = "medimind-users-v1";
+const THEME_STORAGE_KEY = "kura-theme-v1";
 const APP_VERSION = "1.0.1";
 const DEVELOPER_GITHUB = "KingGhidorahX12";
 const PAYPAL_DONATION_URL = "https://paypal.me/KingGhidorahX12";
@@ -896,6 +899,10 @@ async function canUseBiometricUnlock() {
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(true);
+  const [themeHydrated, setThemeHydrated] = useState(false);
+  const [themeKey, setThemeKey] = useState<KuraThemeKey>(DEFAULT_KURA_THEME_KEY);
+  const activeTheme = appThemes[themeKey] ?? appThemes[DEFAULT_KURA_THEME_KEY];
+  applyRuntimeTheme(activeTheme);
   const [authHydrated, setAuthHydrated] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [storedAuthUser, setStoredAuthUser] = useState<AuthUser | null>(null);
@@ -2727,7 +2734,7 @@ function buildContactText() {
       <SafeAreaView style={styles.safe}>
         <AppStatusBar />
         <View style={styles.splashScreen}>
-          <KuraLogo size={190} />
+          <KuraLogo size={190} variant={activeTheme.logoVariant} />
         </View>
       </SafeAreaView>
     );
@@ -2752,7 +2759,7 @@ function buildContactText() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.authBrand}>
-            <KuraLogo size={118} />
+            <KuraLogo size={118} variant={activeTheme.logoVariant} />
           </View>
 
           <View style={styles.authPanel}>
@@ -3559,7 +3566,7 @@ function buildContactText() {
             automaticallyAdjustKeyboardInsets
             showsVerticalScrollIndicator={false}
           >
-            <KuraLogo size={108} />
+            <KuraLogo size={108} variant={activeTheme.logoVariant} />
             <Text style={[styles.profileTitle, styles.centeredTitle]}>Crea tu primer perfil</Text>
             <Text style={styles.firstProfileText}>Este perfil nos ayuda a organizar recetas, inventario y recordatorios desde el primer tratamiento.</Text>
             <View style={styles.firstProfileCard}>
@@ -5022,7 +5029,8 @@ function ModalShell({
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(theme: KuraTheme) {
+  return StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: theme.colors.background
@@ -7449,6 +7457,26 @@ const styles = StyleSheet.create({
   swatchActive: {
     borderColor: theme.colors.ink
   }
+  });
+}
+
+type AppStyles = ReturnType<typeof createStyles>;
+let activeStyles: AppStyles = createStyles(theme);
+
+function applyRuntimeTheme(nextTheme: KuraTheme) {
+  if (theme.key === nextTheme.key) {
+    return;
+  }
+
+  theme = nextTheme;
+  activeStyles = createStyles(nextTheme);
+}
+
+const styles = new Proxy({} as AppStyles, {
+  get(_target, prop: string | symbol) {
+    return activeStyles[prop as keyof AppStyles];
+  }
 });
+
 
 
