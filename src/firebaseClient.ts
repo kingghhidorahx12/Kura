@@ -274,6 +274,28 @@ export async function signInWithFirebaseFacebookAccessToken(accessToken: string)
   return profileFromFirebaseUser(result.user, "facebook");
 }
 
+export async function linkFirebaseGoogleIdToken(idToken: string) {
+  const auth = getFirebaseAuth();
+  if (!auth?.currentUser) {
+    throw new Error("Primero inicia sesión con tu cuenta de correo para conectar Google.");
+  }
+
+  const credential = GoogleAuthProvider.credential(idToken);
+  const result = await linkWithCredential(auth.currentUser, credential);
+  return profileFromFirebaseUser(result.user, "google");
+}
+
+export async function linkFirebaseFacebookAccessToken(accessToken: string) {
+  const auth = getFirebaseAuth();
+  if (!auth?.currentUser) {
+    throw new Error("Primero inicia sesión con tu cuenta de correo para conectar Facebook.");
+  }
+
+  const credential = FacebookAuthProvider.credential(accessToken);
+  const result = await linkWithCredential(auth.currentUser, credential);
+  return profileFromFirebaseUser(result.user, "facebook");
+}
+
 export async function signOutFromFirebase() {
   const auth = getFirebaseAuth();
   if (!auth) {

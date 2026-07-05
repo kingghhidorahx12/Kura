@@ -7,7 +7,7 @@
       "com.googleusercontent.apps.270375464494-itflgjlas726kf7rs075jc3555532d76",
       "fb1040848148361818"
     ],
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/kura-icon.png",
@@ -25,7 +25,7 @@
     },
     "android": {
       "package": "com.medimind.app",
-      "versionCode": 3,
+      "versionCode": 4,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/kura-icon.png",
@@ -52,7 +52,8 @@
       ],
       "expo-web-browser",
       "@react-native-firebase/app",
-      "@react-native-firebase/auth"
+      "@react-native-firebase/auth",
+      "@react-native-google-signin/google-signin"
     ],
     "extra": {
       "eas": {
