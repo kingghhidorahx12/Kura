@@ -6920,7 +6920,7 @@ const styles = StyleSheet.create({
   timePickerSheet: {
     width: "100%",
     maxWidth: 360,
-    gap: 12,
+    gap: 18,
     padding: 14,
     borderRadius: theme.radius.lg,
     backgroundColor: theme.colors.surface,
@@ -6943,7 +6943,10 @@ const styles = StyleSheet.create({
   timeSeparator: {
     color: theme.colors.primaryDark,
     fontSize: 28,
-    fontWeight: "900"
+    fontWeight: "900",
+    width: 24,
+    alignItems: "center",
+    justifyContent: "center"
   },
   timePartLabel: {
     marginBottom: 6,
@@ -6953,7 +6956,10 @@ const styles = StyleSheet.create({
   },
   timeWheelColumn: {
     width: 76,
-    gap: 6
+    gap: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 88
   },
   timeWheelLabel: {
     color: theme.colors.primaryDark,
@@ -6968,11 +6974,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8f3eb",
     borderWidth: 1,
     borderColor: theme.colors.line,
-    alignSelf: "center"
+    alignSelf: "center",
+    width: 76,
+    alignItems: "center",
+    justifyContent: "center"
   },
   timeWheelScroll: {
     height: 154,
-    alignSelf: "center"
+    alignSelf: "center",
+    width: 76
   },
   timeWheelContent: {
     paddingVertical: 54,
@@ -6988,8 +6998,9 @@ const styles = StyleSheet.create({
   },
   timeWheelText: {
     color: theme.colors.primaryDark,
-    fontSize: 18,
-    fontWeight: "700"
+    fontSize: 22,
+    fontWeight: "900",
+    textAlign: "center"
   },
   timeWheelTextActive: {
     color: theme.colors.ink,
