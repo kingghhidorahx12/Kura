@@ -1,14 +1,40 @@
-﻿import { Platform } from "react-native";
+import { Platform } from "react-native";
 import type { FirebaseAuthProfile } from "./firebaseClient";
 
 export type NativePhoneConfirmation = {
+  verificationId?: string | null;
   confirm: (code: string) => Promise<{
     user?: {
       uid?: string;
       displayName?: string | null;
+      email?: string | null;
       phoneNumber?: string | null;
     } | null;
   } | null>;
+};
+
+type NativeAuthModuleLike = {
+  getAuth: () => {
+    currentUser?: {
+      uid?: string;
+      displayName?: string | null;
+      email?: string | null;
+      phoneNumber?: string | null;
+      linkWithCredential?: (credential: unknown) => Promise<{
+        user?: {
+          uid?: string;
+          displayName?: string | null;
+          email?: string | null;
+          phoneNumber?: string | null;
+        } | null;
+      }>;
+    } | null;
+  };
+  signInWithPhoneNumber: (auth: unknown, phoneNumber: string) => Promise<NativePhoneConfirmation>;
+  verifyPhoneNumber: (auth: unknown, phoneNumber: string) => Promise<{ verificationId: string }>;
+  PhoneAuthProvider: {
+    credential: (verificationId: string, code: string) => unknown;
+  };
 };
 
 export function formatPhoneForFirebase(value: string) {
@@ -27,19 +53,19 @@ export function formatPhoneForFirebase(value: string) {
   return digits ? `+${digits}` : "";
 }
 
-export async function sendNativePhoneVerification(phoneNumber: string): Promise<NativePhoneConfirmation | null> {
-  if (Platform.OS === "web") {
-    return null;
-  }
-
-  const authModule = await import("@react-native-firebase/auth");
-  const auth = authModule.getAuth();
-  return authModule.signInWithPhoneNumber(auth, phoneNumber);
+async function getNativeAuthModule() {
+  return (await import("@react-native-firebase/auth")) as unknown as NativeAuthModuleLike;
 }
 
-export async function confirmNativePhoneVerification(confirmation: NativePhoneConfirmation, code: string, fallbackName?: string): Promise<FirebaseAuthProfile> {
-  const result = await confirmation.confirm(code);
-  const user = result?.user;
+function profileFromNativeUser(
+  user: {
+    uid?: string;
+    displayName?: string | null;
+    email?: string | null;
+    phoneNumber?: string | null;
+  } | null | undefined,
+  fallbackName?: string
+): FirebaseAuthProfile {
   const uid = user?.uid;
   const phoneNumber = user?.phoneNumber ?? "";
 
@@ -50,9 +76,28 @@ export async function confirmNativePhoneVerification(confirmation: NativePhoneCo
   return {
     id: uid,
     name: fallbackName?.trim() || user?.displayName || phoneNumber || "Usuario Kura",
-    identifier: phoneNumber,
+    identifier: phoneNumber || user?.email || "telefono@firebase",
     provider: "phone"
   };
+}
+
+export async function sendNativePhoneVerification(phoneNumber: string): Promise<NativePhoneConfirmation | null> {
+  if (Platform.OS === "web") {
+    return null;
+  }
+
+  const authModule = await getNativeAuthModule();
+  const auth = authModule.getAuth();
+  return authModule.signInWithPhoneNumber(auth, phoneNumber);
+}
+
+export async function confirmNativePhoneVerification(
+  confirmation: NativePhoneConfirmation,
+  code: string,
+  fallbackName?: string
+): Promise<FirebaseAuthProfile> {
+  const result = await confirmation.confirm(code);
+  return profileFromNativeUser(result?.user, fallbackName);
 }
 
 export async function sendNativePhoneLinkVerification(phoneNumber: string): Promise<NativePhoneConfirmation | null> {
@@ -60,21 +105,28 @@ export async function sendNativePhoneLinkVerification(phoneNumber: string): Prom
     return null;
   }
 
-  const authModule = await import("@react-native-firebase/auth");
+  const authModule = await getNativeAuthModule();
   const auth = authModule.getAuth();
-  const currentUser = auth.currentUser as unknown as {
-    linkWithPhoneNumber?: (phoneNumber: string) => Promise<NativePhoneConfirmation>;
-  } | null;
+  const currentUser = auth.currentUser;
 
   if (!currentUser) {
     throw new Error("Primero inicia sesión para conectar un teléfono.");
   }
 
-  if (typeof currentUser.linkWithPhoneNumber !== "function") {
-    throw new Error("Esta versión nativa no expone linkWithPhoneNumber. Lo resolvemos con APK nativa y verificación de teléfono.");
-  }
+  const verification = await authModule.verifyPhoneNumber(auth, phoneNumber);
 
-  return currentUser.linkWithPhoneNumber(phoneNumber);
+  return {
+    verificationId: verification.verificationId,
+    confirm: async (code: string) => {
+      const credential = authModule.PhoneAuthProvider.credential(verification.verificationId, code);
+
+      if (!auth.currentUser?.linkWithCredential) {
+        throw new Error("No pude vincular el teléfono con la sesión actual de Firebase.");
+      }
+
+      return auth.currentUser.linkWithCredential(credential);
+    }
+  };
 }
 
 export async function confirmNativePhoneLinkVerification(
@@ -82,6 +134,6 @@ export async function confirmNativePhoneLinkVerification(
   code: string,
   fallbackName?: string
 ): Promise<FirebaseAuthProfile> {
-  return confirmNativePhoneVerification(confirmation, code, fallbackName);
+  const result = await confirmation.confirm(code);
+  return profileFromNativeUser(result?.user, fallbackName);
 }
-
