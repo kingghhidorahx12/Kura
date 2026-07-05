@@ -5700,7 +5700,7 @@ function createStyles(theme: KuraTheme) {
   muted: {
     fontSize: 14,
     lineHeight: 20,
-    color: canvasSubtitleColor
+    color: theme.key === "night" ? lightSurfaceMutedColor : theme.colors.muted
   },
   softText: {
     fontSize: 13,
@@ -5719,11 +5719,11 @@ function createStyles(theme: KuraTheme) {
   statValue: {
     fontSize: 22,
     fontWeight: "900",
-    color: theme.colors.ink
+    color: theme.key === "night" ? lightSurfaceTextColor : theme.colors.ink
   },
   statLabel: {
     fontSize: 12,
-    color: theme.colors.primaryDark,
+    color: theme.key === "night" ? lightSurfaceTextColor : theme.colors.ink,
     fontWeight: "700"
   },
   historyDashboard: {
@@ -5774,7 +5774,7 @@ function createStyles(theme: KuraTheme) {
     backgroundColor: theme.colors.white
   },
   scoreText: {
-    color: theme.colors.primaryDark,
+    color: theme.key === "night" ? lightSurfaceTextColor : theme.colors.ink,
     fontWeight: "900"
   },
   rhythmRecipeName: {
@@ -6536,7 +6536,7 @@ function createStyles(theme: KuraTheme) {
     textAlign: "center"
   },
   noticeMessage: {
-    color: theme.colors.primaryDark,
+    color: theme.key === "night" ? lightSurfaceMutedColor : theme.colors.muted,
     fontSize: 14,
     lineHeight: 20,
     fontWeight: "700",
