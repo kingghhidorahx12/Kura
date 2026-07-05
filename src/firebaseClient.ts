@@ -1,32 +1,6 @@
-import rnFirestore from "@react-native-firebase/firestore";
 import rnAuth from "@react-native-firebase/auth";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-﻿import {
-  getApp,
-  getApps,
-  initializeApp,
-  type FirebaseApp } from "firebase/app";
-import {
-  createUserWithEmailAndPassword,
-  FacebookAuthProvider,
-  getAuth,
-  GoogleAuthProvider,
-  sendPasswordResetEmail,
-  signInWithEmailAndPassword,
-  signInWithCredential,
-  signInWithPopup,
-  linkWithCredential,
-  signOut,
-  updateProfile,
-  type User,
-  onAuthStateChanged,
-  initializeAuth,
-  getReactNativePersistence
-} from "firebase/auth";
-import * as FirebaseAuthModule from "firebase/auth";
-import { collection, doc, getCountFromServer, getDocs, getFirestore, serverTimestamp, setDoc, getDoc } from "firebase/firestore";
-import { firebaseConfig, hasFirebaseConfig } from "./firebaseConfig";
-
+import rnFirestore from "@react-native-firebase/firestore";
+import { hasFirebaseConfig } from "./firebaseConfig";
 export type FirebaseAuthProviderName = "email" | "phone" | "google" | "facebook";
 
 type FirebaseUserLike = {
@@ -69,16 +43,6 @@ export type FirebaseAdminStats = {
   skippedDoseCount: number;
   latestSyncAt: string | null;
 };
-
-function getFirebaseApp(): FirebaseApp | null {
-  if (!hasFirebaseConfig()) {
-    return null;
-  }
-
-  return getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-}
-
-let firebaseAuthInstance: ReturnType<typeof getAuth> | null = null;
 
 function getFirebaseAuth() {
   return hasFirebaseConfig() ? rnAuth() : null;
