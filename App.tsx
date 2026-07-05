@@ -5410,7 +5410,7 @@ function createStyles(theme: KuraTheme) {
     paddingTop: SCREEN_TOP_GAP,
     paddingRight: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.08)",
+    borderBottomColor: theme.colors.line,
     backgroundColor: theme.colors.background
   },
   switcher: {
@@ -5440,7 +5440,7 @@ function createStyles(theme: KuraTheme) {
     borderRadius: theme.radius.pill,
     backgroundColor: theme.colors.backgroundSoft,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)"
+    borderColor: theme.colors.line
   },
   profileChipActive: {
     backgroundColor: theme.colors.primaryDark,
@@ -6215,7 +6215,7 @@ function createStyles(theme: KuraTheme) {
     gap: 4,
     padding: 12,
     borderRadius: theme.radius.sm,
-    backgroundColor: "rgba(255,255,255,0.62)",
+    backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.line
   },
@@ -6350,7 +6350,7 @@ function createStyles(theme: KuraTheme) {
     paddingTop: 10,
     paddingBottom: Platform.OS === "ios" ? 12 : 8,
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.08)",
+    borderTopColor: theme.colors.line,
     backgroundColor: theme.colors.background
   },
   navItem: {
@@ -6363,7 +6363,7 @@ function createStyles(theme: KuraTheme) {
     borderRadius: theme.radius.sm
   },
   navItemActive: {
-    backgroundColor: "rgba(255,255,255,0.08)"
+    backgroundColor: theme.colors.surfaceAlt
   },
   navText: {
     fontSize: 12,
