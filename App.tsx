@@ -4407,7 +4407,7 @@ function EmptyState({ text }: { text: string }) {
 }
 
 function AppStatusBar() {
-  return <NativeStatusBar barStyle="light-content" backgroundColor={theme.colors.background} translucent={false} />;
+  return <NativeStatusBar barStyle={theme.key === "classic" || theme.key === "night" ? "light-content" : "dark-content"} backgroundColor={theme.colors.background} translucent={false} />;
 }
 
 function NoticeModal({ notice, onClose }: { notice: NoticeState | null; onClose: () => void }) {
@@ -5190,6 +5190,10 @@ function ModalShell({
 }
 
 function createStyles(theme: KuraTheme) {
+  const isDarkCanvas = theme.key === "classic" || theme.key === "night";
+  const canvasTitleColor = isDarkCanvas ? theme.colors.white : theme.colors.ink;
+  const canvasSubtitleColor = isDarkCanvas ? theme.colors.mint : theme.colors.primaryDark;
+
   return StyleSheet.create({
   safe: {
     flex: 1,
@@ -5219,7 +5223,7 @@ function createStyles(theme: KuraTheme) {
   },
   splashTagline: {
     marginTop: 4,
-    color: theme.colors.mint,
+    color: canvasSubtitleColor,
     fontSize: 15,
     fontWeight: "800",
     textTransform: "uppercase"
@@ -5247,11 +5251,11 @@ function createStyles(theme: KuraTheme) {
   authAppName: {
     fontSize: 34,
     fontWeight: "900",
-    color: theme.colors.white,
+    color: canvasTitleColor,
     letterSpacing: 0
   },
   authTagline: {
-    color: theme.colors.mint,
+    color: canvasSubtitleColor,
     fontSize: 12,
     fontWeight: "800",
     textTransform: "uppercase"
@@ -5525,7 +5529,7 @@ function createStyles(theme: KuraTheme) {
   eyebrow: {
     fontSize: 13,
     fontWeight: "800",
-    color: theme.colors.mint,
+    color: canvasSubtitleColor,
     textTransform: "uppercase"
   },
   title: {
@@ -5537,7 +5541,7 @@ function createStyles(theme: KuraTheme) {
   profileTitle: {
     fontSize: 34,
     fontWeight: "900",
-    color: theme.colors.mint,
+    color: canvasSubtitleColor,
     letterSpacing: 0
   },
   centeredTitle: {
@@ -5731,7 +5735,7 @@ function createStyles(theme: KuraTheme) {
   sectionTitleText: {
     fontSize: 18,
     fontWeight: "900",
-    color: theme.colors.white
+    color: canvasTitleColor
   },
   emptyBlock: {
     alignItems: "center",
