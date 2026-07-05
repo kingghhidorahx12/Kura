@@ -904,6 +904,45 @@ export default function App() {
   const [themeKey, setThemeKey] = useState<KuraThemeKey>(DEFAULT_KURA_THEME_KEY);
   const activeTheme = appThemes[themeKey] ?? appThemes[DEFAULT_KURA_THEME_KEY];
   applyRuntimeTheme(activeTheme);
+
+  useEffect(() => {
+    let active = true;
+
+    async function hydrateSavedTheme() {
+      try {
+        const savedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
+
+        if (!active) {
+          return;
+        }
+
+        if (savedTheme && Object.prototype.hasOwnProperty.call(appThemes, savedTheme)) {
+          setThemeKey(savedTheme as KuraThemeKey);
+        }
+      } catch {
+        // Si falla la lectura, Kura usa el tema predeterminado.
+      } finally {
+        if (active) {
+          setThemeHydrated(true);
+        }
+      }
+    }
+
+    void hydrateSavedTheme();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!themeHydrated) {
+      return;
+    }
+
+    void AsyncStorage.setItem(THEME_STORAGE_KEY, themeKey);
+  }, [themeHydrated, themeKey]);
+
   const [authHydrated, setAuthHydrated] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [storedAuthUser, setStoredAuthUser] = useState<AuthUser | null>(null);
@@ -3585,6 +3624,16 @@ function buildContactText() {
     );
   }
 
+  async function changeTheme(nextThemeKey: KuraThemeKey) {
+    setThemeKey(nextThemeKey);
+
+    try {
+      await AsyncStorage.setItem(THEME_STORAGE_KEY, nextThemeKey);
+    } catch {
+      showNotice("No se pudo guardar el tema", "Kura cambiará el tema ahora, pero quizá no lo recuerde al volver a abrir.", "warning");
+    }
+  }
+
   function renderThemeSelector() {
     const themeOptions = Object.values(appThemes);
 
@@ -3606,7 +3655,7 @@ function buildContactText() {
               <Pressable
                 key={option.key}
                 style={[styles.themeOption, active && styles.themeOptionActive]}
-                onPress={() => setThemeKey(option.key)}
+                onPress={() => void changeTheme(option.key)}
               >
                 <View style={styles.themeSwatches}>
                   <View style={[styles.themeSwatch, { backgroundColor: option.colors.background }]} />
