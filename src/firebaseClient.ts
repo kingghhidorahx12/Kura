@@ -18,7 +18,8 @@ import {
   updateProfile,
   type User,
   onAuthStateChanged,
-  initializeAuth
+  initializeAuth,
+  getReactNativePersistence
 } from "firebase/auth";
 import * as FirebaseAuthModule from "firebase/auth";
 import { collection, doc, getCountFromServer, getDocs, getFirestore, serverTimestamp, setDoc, getDoc } from "firebase/firestore";
@@ -79,23 +80,14 @@ function getFirebaseAuth() {
     return firebaseAuthInstance;
   }
 
-  const reactNativePersistence = (FirebaseAuthModule as unknown as {
-    getReactNativePersistence?: (storage: unknown) => unknown;
-  }).getReactNativePersistence;
-
-  if (reactNativePersistence) {
-    try {
-      firebaseAuthInstance = initializeAuth(app, {
-        persistence: reactNativePersistence(AsyncStorage) as never
-      });
-      return firebaseAuthInstance;
-    } catch {
-      // Si Auth ya fue inicializado o la persistencia no está disponible,
-      // usamos la instancia estable existente.
-    }
+  try {
+    firebaseAuthInstance = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage)
+    });
+  } catch {
+    firebaseAuthInstance = getAuth(app);
   }
 
-  firebaseAuthInstance = getAuth(app);
   return firebaseAuthInstance;
 }
 
