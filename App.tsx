@@ -5535,7 +5535,7 @@ function createStyles(theme: KuraTheme) {
   title: {
     fontSize: 30,
     fontWeight: "900",
-    color: theme.colors.white,
+    color: canvasTitleColor,
     letterSpacing: 0
   },
   profileTitle: {
@@ -5848,7 +5848,7 @@ function createStyles(theme: KuraTheme) {
     fontSize: 12,
     fontWeight: "900",
     textAlign: "center",
-    color: theme.colors.white
+    color: canvasTitleColor
   },
   sourceBadge: {
     alignSelf: "flex-start",
@@ -5929,7 +5929,7 @@ function createStyles(theme: KuraTheme) {
     backgroundColor: theme.colors.rose
   },
   deleteInventoryText: {
-    color: theme.colors.white,
+    color: canvasTitleColor,
     fontWeight: "900",
     fontSize: 13,
     textAlign: "center",
@@ -6393,7 +6393,7 @@ function createStyles(theme: KuraTheme) {
   navRecipeText: {
     maxWidth: 78,
     textAlign: "center",
-    color: theme.colors.white,
+    color: canvasTitleColor,
     fontSize: 11,
     lineHeight: 13,
     fontWeight: "900"
@@ -7591,7 +7591,7 @@ function createStyles(theme: KuraTheme) {
     textAlign: "center"
   },
   inventoryModeTextActive: {
-    color: theme.colors.white
+    color: canvasTitleColor
   },
   successNotice: {
     minHeight: 48,
