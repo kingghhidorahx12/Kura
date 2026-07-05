@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 ﻿import {
   getApp,
   getApps,
@@ -16,8 +17,10 @@ import {
   signOut,
   updateProfile,
   type User,
-  onAuthStateChanged
+  onAuthStateChanged,
+  initializeAuth
 } from "firebase/auth";
+import * as FirebaseAuthModule from "firebase/auth";
 import { collection, doc, getCountFromServer, getDocs, getFirestore, serverTimestamp, setDoc, getDoc } from "firebase/firestore";
 import { firebaseConfig, hasFirebaseConfig } from "./firebaseConfig";
 
@@ -64,13 +67,36 @@ function getFirebaseApp(): FirebaseApp | null {
   return getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 }
 
+let firebaseAuthInstance: ReturnType<typeof getAuth> | null = null;
+
 function getFirebaseAuth() {
   const app = getFirebaseApp();
   if (!app) {
     return null;
   }
 
-  return getAuth(app);
+  if (firebaseAuthInstance) {
+    return firebaseAuthInstance;
+  }
+
+  const reactNativePersistence = (FirebaseAuthModule as unknown as {
+    getReactNativePersistence?: (storage: unknown) => unknown;
+  }).getReactNativePersistence;
+
+  if (reactNativePersistence) {
+    try {
+      firebaseAuthInstance = initializeAuth(app, {
+        persistence: reactNativePersistence(AsyncStorage) as never
+      });
+      return firebaseAuthInstance;
+    } catch {
+      // Si Auth ya fue inicializado o la persistencia no está disponible,
+      // usamos la instancia estable existente.
+    }
+  }
+
+  firebaseAuthInstance = getAuth(app);
+  return firebaseAuthInstance;
 }
 
 function getFirebaseDb() {
