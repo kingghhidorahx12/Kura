@@ -7,7 +7,7 @@
       "com.googleusercontent.apps.270375464494-itflgjlas726kf7rs075jc3555532d76",
       "fb1040848148361818"
     ],
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/kura-icon.png",
@@ -25,7 +25,7 @@
     },
     "android": {
       "package": "com.medimind.app",
-      "versionCode": 5,
+      "versionCode": 6,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/kura-icon.png",
