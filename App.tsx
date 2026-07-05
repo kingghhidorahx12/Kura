@@ -3119,7 +3119,7 @@ function buildContactText() {
             <View style={styles.emptyBlock}>
               <Check color={theme.colors.primary} size={26} />
               <Text style={styles.cardTitle}>Todo listo por ahora</Text>
-              <Text style={styles.muted}>La agenda se actualiza con las recetas activas.</Text>
+              <Text style={[styles.muted, styles.mutedOnLightSurface]}>La agenda se actualiza con las recetas activas.</Text>
             </View>
           )}
         </View>
@@ -3646,7 +3646,7 @@ function buildContactText() {
           <Sparkles color={theme.colors.primaryDark} size={21} />
           <View style={styles.flex}>
             <Text style={styles.cardTitle}>Apariencia</Text>
-            <Text style={styles.muted}>Elige cómo se ve Kura</Text>
+            <Text style={[styles.muted, styles.mutedOnCurrentSurface]}>Elige cómo se ve Kura</Text>
           </View>
         </View>
 
@@ -4236,7 +4236,7 @@ function BottomNav({ current, onChange, onNewRecipe }: { current: TabKey; onChan
       })}
       <Pressable style={styles.navRecipeButton} onPress={onNewRecipe}>
         <Plus color={theme.colors.white} size={30} />
-        <Text style={styles.navRecipeText}>Agregar receta</Text>
+        <Text style={[styles.navRecipeText, { color: theme.colors.white }]}>Agregar receta</Text>
       </Pressable>
       {rightTabs.map((item) => {
         const Icon = item.icon;
@@ -5243,15 +5243,43 @@ function ModalShell({
 
 function createStyles(theme: KuraTheme) {
   const isDarkCanvas = theme.key === "classic" || theme.key === "night";
-  const canvasTitleColor = theme.key === "night" ? "#6d987d" : isDarkCanvas ? theme.colors.white : theme.colors.ink;
-  const canvasSubtitleColor = theme.key === "night" ? "#c8d9d0" : isDarkCanvas ? theme.colors.mint : theme.colors.primaryDark;
-  const lightSurfaceTextColor = theme.key === "night" ? "#25342f" : theme.colors.primaryDark;
-  const lightSurfaceMutedColor = theme.key === "night" ? "#5a6d64" : theme.colors.softText;
-  const darkSurfaceTextColor = theme.key === "night" ? "#f2fbf6" : theme.colors.ink;
-  const darkSurfaceMutedColor = theme.key === "night" ? "#d2e2d9" : theme.colors.muted;
-  const darkSurfaceSoftColor = theme.key === "night" ? "#adc1b6" : theme.colors.softText;
+  const surfaceIsDark = theme.key === "night";
+
+  const textOnCanvas = isDarkCanvas ? theme.colors.white : theme.colors.ink;
+  const mutedOnCanvas = isDarkCanvas ? "#d4e4dc" : theme.colors.muted;
+
+  const textOnLightSurface = "#25342f";
+  const mutedOnLightSurface = "#5f6f68";
+
+  const textOnDarkSurface = "#f5fff9";
+  const mutedOnDarkSurface = "#d4e4dc";
+
+  const textOnCurrentSurface = surfaceIsDark ? textOnDarkSurface : textOnLightSurface;
+  const mutedOnCurrentSurface = surfaceIsDark ? mutedOnDarkSurface : mutedOnLightSurface;
+
+  const textOnPrimary = theme.colors.white;
+
+  const canvasTitleColor = textOnCanvas;
+  const canvasSubtitleColor = mutedOnCanvas;
+  const lightSurfaceTextColor = textOnLightSurface;
+  const lightSurfaceMutedColor = mutedOnLightSurface;
+  const darkSurfaceTextColor = textOnDarkSurface;
+  const darkSurfaceMutedColor = mutedOnDarkSurface;
+  const darkSurfaceSoftColor = mutedOnDarkSurface;
 
   return StyleSheet.create({
+  mutedOnCurrentSurface: {
+    color: mutedOnCurrentSurface
+  },
+  textOnCurrentSurface: {
+    color: textOnCurrentSurface
+  },
+  mutedOnLightSurface: {
+    color: mutedOnLightSurface
+  },
+  textOnLightSurface: {
+    color: textOnLightSurface
+  },
   safe: {
     flex: 1,
     backgroundColor: theme.colors.background
@@ -5703,7 +5731,7 @@ function createStyles(theme: KuraTheme) {
   muted: {
     fontSize: 14,
     lineHeight: 20,
-    color: theme.key === "night" ? lightSurfaceMutedColor : theme.colors.muted
+    color: mutedOnCurrentSurface
   },
   softText: {
     fontSize: 13,
@@ -5722,11 +5750,11 @@ function createStyles(theme: KuraTheme) {
   statValue: {
     fontSize: 22,
     fontWeight: "900",
-    color: theme.key === "night" ? lightSurfaceTextColor : theme.colors.ink
+    color: textOnLightSurface
   },
   statLabel: {
     fontSize: 12,
-    color: theme.key === "night" ? lightSurfaceTextColor : theme.colors.ink,
+    color: textOnLightSurface,
     fontWeight: "700"
   },
   historyDashboard: {
@@ -5777,7 +5805,7 @@ function createStyles(theme: KuraTheme) {
     backgroundColor: theme.colors.white
   },
   scoreText: {
-    color: theme.key === "night" ? lightSurfaceTextColor : theme.colors.ink,
+    color: textOnLightSurface,
     fontWeight: "900"
   },
   rhythmRecipeName: {
@@ -5855,7 +5883,7 @@ function createStyles(theme: KuraTheme) {
   cardTitle: {
     fontSize: 16,
     fontWeight: "900",
-    color: darkSurfaceTextColor
+    color: textOnCurrentSurface
   },
   rowBetween: {
     flexDirection: "row",
@@ -6088,7 +6116,7 @@ function createStyles(theme: KuraTheme) {
   profileName: {
     fontSize: 20,
     fontWeight: "900",
-    color: darkSurfaceTextColor
+    color: textOnCurrentSurface
   },
   iconSoftButton: {
     width: 40,
@@ -6118,12 +6146,12 @@ function createStyles(theme: KuraTheme) {
     borderColor: theme.colors.line
   },
   accountAccessTitle: {
-    color: darkSurfaceTextColor,
+    color: textOnCurrentSurface,
     fontSize: 15,
     fontWeight: "900"
   },
   accountAccessText: {
-    color: darkSurfaceMutedColor,
+    color: mutedOnCurrentSurface,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: "700"
@@ -6203,13 +6231,13 @@ function createStyles(theme: KuraTheme) {
     borderColor: "rgba(39, 95, 70, 0.22)"
   },
   themeOptionText: {
-    color: lightSurfaceTextColor,
+    color: textOnCurrentSurface,
     fontSize: 13,
     fontWeight: "900",
     textAlign: "center"
   },
   themeOptionTextActive: {
-    color: theme.colors.white
+    color: textOnCurrentSurface
   },
   themeActiveBadge: {
     overflow: "hidden",
@@ -6451,7 +6479,7 @@ function createStyles(theme: KuraTheme) {
   navRecipeText: {
     maxWidth: 78,
     textAlign: "center",
-    color: canvasTitleColor,
+    color: textOnPrimary,
     fontSize: 11,
     lineHeight: 13,
     fontWeight: "900"
@@ -6539,7 +6567,7 @@ function createStyles(theme: KuraTheme) {
     textAlign: "center"
   },
   noticeMessage: {
-    color: theme.key === "night" ? lightSurfaceMutedColor : theme.colors.muted,
+    color: mutedOnLightSurface,
     fontSize: 14,
     lineHeight: 20,
     fontWeight: "700",
@@ -6813,7 +6841,7 @@ function createStyles(theme: KuraTheme) {
     backgroundColor: theme.colors.primary
   },
   primaryButtonText: {
-    color: theme.colors.white,
+    color: textOnPrimary,
     fontWeight: "900",
     fontSize: 15,
     textAlign: "center",
@@ -6910,7 +6938,7 @@ function createStyles(theme: KuraTheme) {
     textAlign: "center"
   },
   stepPillTextActive: {
-    color: theme.colors.white
+    color: textOnPrimary
   },
   formStack: {
     gap: 14,
