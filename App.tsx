@@ -3464,6 +3464,45 @@ function buildContactText() {
     );
   }
 
+  function renderThemeSelector() {
+    const themeOptions = Object.values(appThemes);
+
+    return (
+      <View style={styles.appearancePanel}>
+        <View style={styles.nextHeader}>
+          <Sparkles color={theme.colors.primaryDark} size={21} />
+          <View style={styles.flex}>
+            <Text style={styles.cardTitle}>Apariencia</Text>
+            <Text style={styles.muted}>Elige cómo se ve Kura</Text>
+          </View>
+        </View>
+
+        <View style={styles.themeGrid}>
+          {themeOptions.map((option) => {
+            const active = option.key === themeKey;
+
+            return (
+              <Pressable
+                key={option.key}
+                style={[styles.themeOption, active && styles.themeOptionActive]}
+                onPress={() => setThemeKey(option.key)}
+              >
+                <View style={styles.themeSwatches}>
+                  <View style={[styles.themeSwatch, { backgroundColor: option.colors.background }]} />
+                  <View style={[styles.themeSwatch, { backgroundColor: option.colors.surface }]} />
+                  <View style={[styles.themeSwatch, { backgroundColor: option.colors.primary }]} />
+                </View>
+
+                <Text style={[styles.themeOptionText, active && styles.themeOptionTextActive]}>{option.label}</Text>
+                {active ? <Text style={styles.themeActiveBadge}>Activo</Text> : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+    );
+  }
+
   function renderAdminPanel() {
     if (!isAdminAuthUser(authUser)) {
       return null;
@@ -5894,6 +5933,70 @@ function createStyles(theme: KuraTheme) {
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
     borderColor: theme.colors.line
+  },
+  appearancePanel: {
+    gap: 12,
+    padding: 14,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.line
+  },
+  themeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10
+  },
+  themeOption: {
+    flexGrow: 1,
+    flexBasis: "46%",
+    minHeight: 104,
+    gap: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.colors.line
+  },
+  themeOptionActive: {
+    backgroundColor: theme.colors.mint,
+    borderWidth: 2,
+    borderColor: theme.colors.primary
+  },
+  themeSwatches: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6
+  },
+  themeSwatch: {
+    width: 22,
+    height: 22,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: "rgba(39, 95, 70, 0.22)"
+  },
+  themeOptionText: {
+    color: theme.colors.primaryDark,
+    fontSize: 13,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  themeOptionTextActive: {
+    color: theme.colors.ink
+  },
+  themeActiveBadge: {
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.primary,
+    color: theme.colors.white,
+    fontSize: 11,
+    fontWeight: "900",
+    textAlign: "center"
   },
   adminPanel: {
     gap: 12,
