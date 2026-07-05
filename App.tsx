@@ -4177,7 +4177,7 @@ function BottomNav({ current, onChange, onNewRecipe }: { current: TabKey; onChan
 
         return (
           <Pressable key={item.key} style={[styles.navItem, active && styles.navItemActive]} onPress={() => onChange(item.key)}>
-            <Icon color={active ? theme.colors.white : theme.colors.mint} size={24} strokeWidth={active ? 2.8 : 2} />
+            <Icon color={active ? theme.colors.white : (theme.key === "classic" || theme.key === "night" ? theme.colors.mint : theme.colors.primaryDark)} size={24} strokeWidth={active ? 2.8 : 2} />
             <Text style={[styles.navText, active && styles.navTextActive]}>{item.label}</Text>
           </Pressable>
         );
@@ -4192,7 +4192,7 @@ function BottomNav({ current, onChange, onNewRecipe }: { current: TabKey; onChan
 
         return (
           <Pressable key={item.key} style={[styles.navItem, active && styles.navItemActive]} onPress={() => onChange(item.key)}>
-            <Icon color={active ? theme.colors.white : theme.colors.mint} size={24} strokeWidth={active ? 2.8 : 2} />
+            <Icon color={active ? theme.colors.white : (theme.key === "classic" || theme.key === "night" ? theme.colors.mint : theme.colors.primaryDark)} size={24} strokeWidth={active ? 2.8 : 2} />
             <Text style={[styles.navText, active && styles.navTextActive]}>{item.label}</Text>
           </Pressable>
         );
@@ -5214,7 +5214,7 @@ function createStyles(theme: KuraTheme) {
     marginTop: 12,
     fontSize: 42,
     fontWeight: "900",
-    color: theme.colors.white,
+    color: theme.key === "classic" || theme.key === "night" ? theme.colors.white : theme.colors.primaryDark,
     letterSpacing: 0
   },
   splashTagline: {
@@ -6363,13 +6363,13 @@ function createStyles(theme: KuraTheme) {
     borderRadius: theme.radius.sm
   },
   navItemActive: {
-    backgroundColor: theme.colors.surfaceAlt
+    backgroundColor: theme.colors.primary
   },
   navText: {
     fontSize: 12,
     fontWeight: "800",
     textAlign: "center",
-    color: theme.colors.mint
+    color: theme.key === "classic" || theme.key === "night" ? theme.colors.mint : theme.colors.primaryDark
   },
   navTextActive: {
     color: theme.colors.white
