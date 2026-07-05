@@ -4717,13 +4717,21 @@ function TimeSelector({ value, onChange }: { value: string; onChange: (value: st
   const [open, setOpen] = useState(false);
   const [draftValue, setDraftValue] = useState(value || currentTimeKey(new Date()));
   const [hour = "", minute = ""] = draftValue.split(":");
-  const hourOptions = Array.from({ length: 24 }, (_, index) => index.toString().padStart(2, "0"));
-  const minuteOptions = Array.from({ length: 60 }, (_, index) => index.toString().padStart(2, "0"));
-
   function updateTime(nextHour = hour, nextMinute = minute) {
     const fallback = currentTimeKey(new Date());
     const [fallbackHour, fallbackMinute] = fallback.split(":");
     setDraftValue(`${nextHour || fallbackHour}:${nextMinute || fallbackMinute}`);
+  }
+
+  function shiftTime(part: "hour" | "minute", delta: number) {
+    const fallback = currentTimeKey(new Date());
+    const [fallbackHour, fallbackMinute] = fallback.split(":");
+    const currentHour = Number.parseInt(hour || fallbackHour, 10);
+    const currentMinute = Number.parseInt(minute || fallbackMinute, 10);
+    const nextHour = part === "hour" ? (currentHour + delta + 24) % 24 : currentHour;
+    const nextMinute = part === "minute" ? (currentMinute + delta + 60) % 60 : currentMinute;
+
+    setDraftValue(`${nextHour.toString().padStart(2, "0")}:${nextMinute.toString().padStart(2, "0")}`);
   }
 
   return (
@@ -4769,10 +4777,34 @@ function TimeSelector({ value, onChange }: { value: string; onChange: (value: st
                 <X color={theme.colors.ink} size={20} />
               </Pressable>
             </View>
-            <View style={styles.timeWheel}>
-              <TimeWheelColumn label="Hora" value={hour} options={hourOptions} onSelect={(nextHour) => updateTime(nextHour, minute)} />
-              <Text style={styles.timeSeparator}>:</Text>
-              <TimeWheelColumn label="Min" value={minute} options={minuteOptions} onSelect={(nextMinute) => updateTime(hour, nextMinute)} />
+            <View style={styles.timeStepper}>
+              <View style={styles.timeStepperColumn}>
+                <Text style={styles.timeWheelLabel}>Hora</Text>
+                <Pressable style={styles.timeStepperButton} onPress={() => shiftTime("hour", 1)}>
+                  <Text style={styles.timeStepperButtonText}>+</Text>
+                </Pressable>
+                <View style={styles.timeStepperValueBox}>
+                  <Text style={styles.timeStepperValue}>{hour || "00"}</Text>
+                </View>
+                <Pressable style={styles.timeStepperButton} onPress={() => shiftTime("hour", -1)}>
+                  <Text style={styles.timeStepperButtonText}>-</Text>
+                </Pressable>
+              </View>
+
+              <Text style={styles.timeStepperColon}>:</Text>
+
+              <View style={styles.timeStepperColumn}>
+                <Text style={styles.timeWheelLabel}>Min</Text>
+                <Pressable style={styles.timeStepperButton} onPress={() => shiftTime("minute", 1)}>
+                  <Text style={styles.timeStepperButtonText}>+</Text>
+                </Pressable>
+                <View style={styles.timeStepperValueBox}>
+                  <Text style={styles.timeStepperValue}>{minute || "00"}</Text>
+                </View>
+                <Pressable style={styles.timeStepperButton} onPress={() => shiftTime("minute", -1)}>
+                  <Text style={styles.timeStepperButtonText}>-</Text>
+                </Pressable>
+              </View>
             </View>
             <Pressable
               style={styles.primaryButton}
@@ -6920,14 +6952,78 @@ const styles = StyleSheet.create({
   timePickerSheet: {
     width: "100%",
     maxWidth: 360,
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 18,
-    padding: 14,
+    padding: 18,
     borderRadius: theme.radius.lg,
     backgroundColor: theme.colors.surface,
     borderWidth: 1,
-    borderColor: theme.colors.line,
+    borderColor: theme.colors.line
+  },
+  timeStepper: {
+    width: "100%",
+    maxWidth: 300,
+    alignSelf: "center",
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center"
+    justifyContent: "center",
+    gap: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.line,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.white
+  },
+  timeStepperColumn: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minWidth: 88
+  },
+  timeStepperButton: {
+    width: 58,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.mint,
+    borderWidth: 1,
+    borderColor: "rgba(39, 95, 70, 0.16)"
+  },
+  timeStepperButtonText: {
+    color: theme.colors.primaryDark,
+    fontSize: 24,
+    lineHeight: 28,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  timeStepperValueBox: {
+    width: 72,
+    minHeight: 54,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.radius.md,
+    backgroundColor: "#f8f3eb",
+    borderWidth: 1,
+    borderColor: theme.colors.line
+  },
+  timeStepperValue: {
+    color: theme.colors.primaryDark,
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  timeStepperColon: {
+    marginTop: 26,
+    color: theme.colors.primaryDark,
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: "900",
+    textAlign: "center"
   },
   timeWheel: {
     flexDirection: "row",
