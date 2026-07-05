@@ -67,7 +67,14 @@ import { DoseEvent, DoseStatus, Medication, NewMedicationDraft, Profile, Profile
 import { KuraLogo } from "./src/KuraLogo";
 
 let theme: KuraTheme = appThemes[DEFAULT_KURA_THEME_KEY];
-import { confirmNativePhoneVerification, formatPhoneForFirebase, sendNativePhoneVerification, type NativePhoneConfirmation } from "./src/nativePhoneAuth";
+import {
+  confirmNativePhoneLinkVerification,
+  confirmNativePhoneVerification,
+  formatPhoneForFirebase,
+  sendNativePhoneLinkVerification,
+  sendNativePhoneVerification,
+  type NativePhoneConfirmation
+} from "./src/nativePhoneAuth";
 import {
   createFirebaseEmailUser,
   getFirebaseAdminStats,
@@ -81,7 +88,8 @@ import {
   signInWithFirebaseGoogleIdToken,
   linkFirebaseFacebookAccessToken,
   linkFirebaseGoogleIdToken,
-  signInWithFirebaseSocial,
+  signInWithFirebaseSocial,
+
   syncFirebaseUserRecord,
   waitForFirebaseAuthReady,
   type FirebaseAdminStats,
@@ -964,6 +972,10 @@ export default function App() {
   const [useManualAuthForm, setUseManualAuthForm] = useState(false);
   const [phoneCodeState, setPhoneCodeState] = useState<PhoneCodeState | null>(null);
   const nativePhoneConfirmationRef = useRef<NativePhoneConfirmation | null>(null);
+  const phoneLinkConfirmationRef = useRef<NativePhoneConfirmation | null>(null);
+  const [phoneLinkIdentifier, setPhoneLinkIdentifier] = useState("");
+  const [phoneLinkCode, setPhoneLinkCode] = useState("");
+  const [phoneLinkNotice, setPhoneLinkNotice] = useState("");
   const lastActivityAtRef = useRef(Date.now());
   const lockingSessionRef = useRef(false);
   const [remoteAdminStats, setRemoteAdminStats] = useState<FirebaseAdminStats | null>(null);
@@ -1971,6 +1983,94 @@ export default function App() {
     } catch (error) {
       const message = error instanceof Error ? error.message : firebaseErrorMessage(error);
       showNotice(provider === "google" ? "No se pudo conectar Google" : "No se pudo conectar Facebook", message, "warning");
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function sendPhoneLinkCode() {
+    if (!authUser) {
+      showNotice("Primero inicia sesión", "Entra a tu cuenta antes de conectar un teléfono.", "warning");
+      return;
+    }
+
+    if (authBusy) {
+      return;
+    }
+
+    const formattedPhone = formatPhoneForFirebase(phoneLinkIdentifier);
+
+    if (!formattedPhone || formattedPhone.length < 11) {
+      showNotice("Número incompleto", "Escribe un número celular válido. Si es de México, puedes escribir solo los 10 dígitos.", "warning");
+      return;
+    }
+
+    setAuthBusy(true);
+
+    try {
+      setPhoneLinkNotice("Enviando SMS de vinculación...");
+      const confirmation = await sendNativePhoneLinkVerification(formattedPhone);
+
+      if (!confirmation) {
+        showNotice("SMS no disponible", "La vinculación por SMS necesita la APK instalada.", "warning");
+        setPhoneLinkNotice("");
+        return;
+      }
+
+      phoneLinkConfirmationRef.current = confirmation;
+      setPhoneLinkCode("");
+      setPhoneLinkNotice(`Te enviamos un SMS a ${formattedPhone}. Escribe el código para conectar ese teléfono.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : firebaseErrorMessage(error);
+      showNotice("No se pudo enviar SMS", message, "warning");
+      setPhoneLinkNotice("");
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function confirmPhoneLinkCode() {
+    if (!authUser) {
+      showNotice("Primero inicia sesión", "Entra a tu cuenta antes de conectar un teléfono.", "warning");
+      return;
+    }
+
+    if (authBusy) {
+      return;
+    }
+
+    const confirmation = phoneLinkConfirmationRef.current;
+    const code = phoneLinkCode.trim();
+
+    if (!confirmation) {
+      showNotice("Envía el SMS", "Primero envía el código al teléfono que quieres conectar.", "warning");
+      return;
+    }
+
+    if (!code) {
+      showNotice("Falta el código", "Escribe el código que llegó por SMS.", "warning");
+      return;
+    }
+
+    setAuthBusy(true);
+
+    try {
+      const firebaseProfile = await confirmNativePhoneLinkVerification(confirmation, code, authUser.name);
+
+      phoneLinkConfirmationRef.current = null;
+      setPhoneLinkCode("");
+      setPhoneLinkNotice("");
+      setPhoneLinkIdentifier("");
+
+      await saveAuthUser({
+        ...authUser,
+        id: firebaseProfile.id
+      });
+
+      showNotice("Teléfono conectado", "Ya puedes usar ese número como método de acceso para esta misma cuenta.", "success");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : firebaseErrorMessage(error);
+      showNotice("No se pudo conectar teléfono", message, "warning");
     } finally {
       setAuthBusy(false);
     }
@@ -3598,7 +3698,7 @@ function buildContactText() {
           </View>
           <View style={styles.accountAccessPanel}>
             <Text style={styles.accountAccessTitle}>Métodos de acceso</Text>
-            <Text style={styles.accountAccessText}>Conecta Google o Facebook para entrar a esta misma cuenta.</Text>
+            <Text style={styles.accountAccessText}>Conecta Google, Facebook o teléfono para entrar a esta misma cuenta.</Text>
 
             <View style={styles.accountAccessButtons}>
               <Pressable
@@ -3616,6 +3716,48 @@ function buildContactText() {
               >
                 <Text style={styles.accountAccessButtonText}>Conectar Facebook</Text>
               </Pressable>
+            </View>
+
+            <View style={{ gap: 10, marginTop: 12 }}>
+              <FloatingInput
+                label="Teléfono para conectar"
+                value={phoneLinkIdentifier}
+                onChangeText={setPhoneLinkIdentifier}
+                keyboardType="phone-pad"
+              />
+
+              {phoneLinkConfirmationRef.current ? (
+                <FloatingInput
+                  label="Código SMS"
+                  value={phoneLinkCode}
+                  onChangeText={setPhoneLinkCode}
+                  keyboardType="numeric"
+                />
+              ) : null}
+
+              <View style={styles.accountAccessButtons}>
+                <Pressable
+                  disabled={authBusy}
+                  style={[styles.accountAccessButton, authBusy && styles.disabledButton]}
+                  onPress={() => void sendPhoneLinkCode()}
+                >
+                  <Text style={styles.accountAccessButtonText}>
+                    {phoneLinkConfirmationRef.current ? "Reenviar SMS" : "Conectar teléfono"}
+                  </Text>
+                </Pressable>
+
+                {phoneLinkConfirmationRef.current ? (
+                  <Pressable
+                    disabled={authBusy}
+                    style={[styles.accountAccessButton, authBusy && styles.disabledButton]}
+                    onPress={() => void confirmPhoneLinkCode()}
+                  >
+                    <Text style={styles.accountAccessButtonText}>Confirmar teléfono</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+
+              {phoneLinkNotice ? <Text style={styles.accountAccessText}>{phoneLinkNotice}</Text> : null}
             </View>
           </View>
 
@@ -5815,7 +5957,8 @@ function createStyles(theme: KuraTheme) {
   sectionTitle: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "space-between"
+,
     color: canvasTitleColor
   },
   sectionTitleText: {
