@@ -1,6 +1,6 @@
-# Seguridad de MediMind
+# Seguridad de Kura
 
-Gracias por ayudar a cuidar MediMind.
+Gracias por ayudar a cuidar Kura.
 
 Si encuentras una vulnerabilidad, no la publiques en issues ni compartas datos
 de usuarios. Reporta el problema de forma privada a:
@@ -18,7 +18,7 @@ Incluye, si puedes:
 
 ## Alcance V1
 
-MediMind no es una app médica profesional y no sustituye indicaciones de un
+Kura no es una app médica profesional y no sustituye indicaciones de un
 médico. La seguridad prioritaria de V1 está enfocada en:
 
 - Proteger cuentas con Firebase Authentication.

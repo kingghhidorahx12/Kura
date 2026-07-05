@@ -1,6 +1,6 @@
-# MediMind
+# Kura
 
-MediMind es una app móvil para registrar tratamientos, organizar recordatorios de
+Kura es una app móvil para registrar tratamientos, organizar recordatorios de
 dosis y dar seguimiento básico al inventario de medicamentos.
 
 La app está pensada como un asistente amable de recordatorios. No recomienda
@@ -29,7 +29,7 @@ Revisar:
 
 ## Derechos
 
-MediMind es un proyecto de KingGhidorahX12.
+Kura es un proyecto de KingGhidorahX12.
 
 Consulta `LICENSE`. El código se publica, si así se decide, con todos los
 derechos reservados. El acceso al repositorio no autoriza copiar, vender,

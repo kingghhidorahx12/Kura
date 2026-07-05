@@ -1,13 +1,13 @@
-# MediMind: cierre legal y seguridad V1
+# Kura: cierre legal y seguridad V1
 
-Este documento no sustituye asesoría legal ni una auditoría profesional de seguridad. Sirve como guía práctica para preparar MediMind antes de compartirla públicamente.
+Este documento no sustituye asesoría legal ni una auditoría profesional de seguridad. Sirve como guía práctica para preparar Kura antes de compartirla públicamente.
 
 ## 1. Derechos y respaldo de autor
 
-Para proteger MediMind conviene separar tres cosas:
+Para proteger Kura conviene separar tres cosas:
 
 - Código y diseño de la app: registrar como obra/programa de cómputo ante INDAUTOR.
-- Nombre y logo `MediMind`: revisar disponibilidad y registrar marca ante IMPI.
+- Nombre y logo `Kura`: revisar disponibilidad y registrar marca ante IMPI.
 - Repositorio: mantener historial de Git, versiones, commits y releases firmados o claramente fechados.
 
 Pasos recomendados:
@@ -15,12 +15,12 @@ Pasos recomendados:
 1. Conserva el repositorio privado o público con commits ordenados y etiquetas como `v1.0.0`.
 2. Genera un paquete de evidencia de la versión que quieres proteger: código fuente, logo, capturas, README, fecha de release y APK/AAB.
 3. Registra la obra en el Registro Público del Derecho de Autor de INDAUTOR. El portal de INDAUTOR muestra el servicio de Registro Público del Derecho de Autor y costos vigentes.
-4. Registra o al menos busca la marca `MediMind` en IMPI antes de compartirla demasiado.
-5. Agrega dentro de la app una leyenda tipo: `© 2026 KingGhidorahX12. MediMind. Todos los derechos reservados.`
+4. Registra o al menos busca la marca `Kura` en IMPI antes de compartirla demasiado.
+5. Agrega dentro de la app una leyenda tipo: `© 2026 KingGhidorahX12. Kura. Todos los derechos reservados.`
 
 ## 2. Privacidad y datos personales
 
-MediMind maneja datos delicados por su contexto: perfiles, edad, tratamientos, medicamentos, horarios y registros de dosis. Aunque no sea una app médica profesional, debe tratarse con mucho cuidado.
+Kura maneja datos delicados por su contexto: perfiles, edad, tratamientos, medicamentos, horarios y registros de dosis. Aunque no sea una app médica profesional, debe tratarse con mucho cuidado.
 
 Antes de publicarla:
 
