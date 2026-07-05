@@ -66,7 +66,7 @@ export async function requestFacebookAccessToken() {
     clientId,
     redirectUri: facebookNativeRedirectUri,
     responseType: AuthSession.ResponseType.Token,
-    scopes: ["public_profile", "email"]
+    scopes: ["public_profile"]
   });
 
   const result = await request.promptAsync(facebookDiscovery);
