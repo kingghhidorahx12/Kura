@@ -1,4 +1,8 @@
-﻿import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
+﻿import {
+  getApp,
+  getApps,
+  initializeApp,
+  type FirebaseApp } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
   FacebookAuthProvider,
@@ -11,9 +15,10 @@ import {
   linkWithCredential,
   signOut,
   updateProfile,
-  type User
+  type User,
+  onAuthStateChanged
 } from "firebase/auth";
-import { collection, doc, getCountFromServer, getDocs, getFirestore, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, getCountFromServer, getDocs, getFirestore, serverTimestamp, setDoc, getDoc } from "firebase/firestore";
 import { firebaseConfig, hasFirebaseConfig } from "./firebaseConfig";
 
 export type FirebaseAuthProviderName = "email" | "phone" | "google" | "facebook";
@@ -61,7 +66,11 @@ function getFirebaseApp(): FirebaseApp | null {
 
 function getFirebaseAuth() {
   const app = getFirebaseApp();
-  return app ? getAuth(app) : null;
+  if (!app) {
+    return null;
+  }
+
+  return getAuth(app);
 }
 
 function getFirebaseDb() {
@@ -153,6 +162,41 @@ export async function saveFirebaseUsageSnapshot(userId: string, snapshot: Fireba
   return true;
 }
 
+export async function saveFirebaseUserAppState(userId: string, appState: unknown) {
+  const db = getFirebaseDb();
+  if (!db) {
+    return false;
+  }
+
+  await setDoc(
+    doc(db, "usageSnapshots", userId),
+    {
+      userId,
+      appState,
+      appStateUpdatedAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    },
+    { merge: true }
+  );
+
+  return true;
+}
+
+export async function getFirebaseUserAppState(userId: string) {
+  const db = getFirebaseDb();
+  if (!db) {
+    return null;
+  }
+
+  const snapshot = await getDoc(doc(db, "usageSnapshots", userId));
+  if (!snapshot.exists()) {
+    return null;
+  }
+
+  const data = snapshot.data() as { appState?: unknown };
+  return data.appState ?? null;
+}
+
 export async function getFirebaseAdminStats(): Promise<FirebaseAdminStats | null> {
   const db = getFirebaseDb();
   if (!db) {
@@ -207,6 +251,29 @@ export async function getFirebaseAdminStats(): Promise<FirebaseAdminStats | null
     usageSnapshotCount: usageSnapshots.data().count,
     ...totals
   };
+}
+
+export async function waitForFirebaseAuthReady() {
+  const auth = getFirebaseAuth();
+  if (!auth) {
+    return null;
+  }
+
+  await new Promise<void>((resolve) => {
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      () => {
+        unsubscribe();
+        resolve();
+      },
+      () => {
+        unsubscribe();
+        resolve();
+      }
+    );
+  });
+
+  return auth.currentUser ? profileFromFirebaseUser(auth.currentUser, "email") : null;
 }
 
 export async function signInWithFirebaseEmail(email: string, password: string) {

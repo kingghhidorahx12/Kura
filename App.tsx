@@ -71,8 +71,10 @@ import { confirmNativePhoneVerification, formatPhoneForFirebase, sendNativePhone
 import {
   createFirebaseEmailUser,
   getFirebaseAdminStats,
+  getFirebaseUserAppState,
   hasFirebaseConfig,
   saveFirebaseUsageSnapshot,
+  saveFirebaseUserAppState,
   sendFirebasePasswordReset,
   signInWithFirebaseEmail,
   signInWithFirebaseFacebookAccessToken,
@@ -81,6 +83,7 @@ import {
   linkFirebaseGoogleIdToken,
   signInWithFirebaseSocial,
   syncFirebaseUserRecord,
+  waitForFirebaseAuthReady,
   type FirebaseAdminStats,
   type FirebaseAuthProfile
 } from "./src/firebaseClient";
