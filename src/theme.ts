@@ -34,7 +34,7 @@ export const theme = {
   }
 };
 
-export type KuraThemeKey = "classic" | "light" | "natural" | "night";
+export type KuraThemeKey = "classic" | "light" | "natural" | "night" | "cielo" | "durazno";
 export type KuraLogoVariant = "white" | "dark";
 
 export type KuraTheme = typeof theme & {
@@ -94,6 +94,56 @@ export const appThemes: Record<KuraThemeKey, KuraTheme> = {
       primary: "#4f8b67",
       primaryDark: "#2f6246",
       mint: "#d9eddf",
+      white: "#ffffff"
+    }
+  },
+  cielo: {
+    ...theme,
+    key: "cielo",
+    label: "Cielo",
+    logoVariant: "dark",
+    colors: {
+      ...theme.colors,
+      ink: "#20333d",
+      muted: "#5f7580",
+      softText: "#7f949d",
+      background: "#eef8fb",
+      backgroundSoft: "#dceff5",
+      surface: "#ffffff",
+      surfaceAlt: "#e2f1f6",
+      line: "#c7dce4",
+      primary: "#3e7fa8",
+      primaryDark: "#24516c",
+      mint: "#d9edf4",
+      apricot: "#f2c9aa",
+      rose: "#e79a9a",
+      lavender: "#aab9d8",
+      yellow: "#efd273",
+      white: "#ffffff"
+    }
+  },
+  durazno: {
+    ...theme,
+    key: "durazno",
+    label: "Durazno",
+    logoVariant: "dark",
+    colors: {
+      ...theme.colors,
+      ink: "#3d3028",
+      muted: "#7a6557",
+      softText: "#9b8575",
+      background: "#fff6ea",
+      backgroundSoft: "#f8e7d2",
+      surface: "#fffaf0",
+      surfaceAlt: "#f7ead8",
+      line: "#e4cdb5",
+      primary: "#c76f4e",
+      primaryDark: "#74402f",
+      mint: "#dbeadd",
+      apricot: "#f0b27a",
+      rose: "#df8c8c",
+      lavender: "#c3add0",
+      yellow: "#efd273",
       white: "#ffffff"
     }
   },
