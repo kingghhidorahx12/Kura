@@ -8,6 +8,7 @@ import {
   signInWithEmailAndPassword,
   signInWithCredential,
   signInWithPopup,
+  linkWithCredential,
   signOut,
   updateProfile,
   type User
