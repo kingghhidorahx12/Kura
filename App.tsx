@@ -6138,7 +6138,7 @@ function createStyles(theme: KuraTheme) {
     borderColor: theme.colors.line
   },
   accountAccessButtonText: {
-    color: theme.colors.primaryDark,
+    color: lightSurfaceTextColor,
     fontSize: 12,
     fontWeight: "900",
     textAlign: "center"
@@ -6196,7 +6196,7 @@ function createStyles(theme: KuraTheme) {
     borderColor: "rgba(39, 95, 70, 0.22)"
   },
   themeOptionText: {
-    color: theme.colors.primaryDark,
+    color: lightSurfaceTextColor,
     fontSize: 13,
     fontWeight: "900",
     textAlign: "center"
@@ -6835,7 +6835,7 @@ function createStyles(theme: KuraTheme) {
     backgroundColor: theme.colors.mint
   },
   secondaryButtonText: {
-    color: theme.colors.primaryDark,
+    color: lightSurfaceTextColor,
     fontWeight: "900",
     fontSize: 14,
     textAlign: "center",
@@ -6866,7 +6866,7 @@ function createStyles(theme: KuraTheme) {
     borderColor: theme.colors.primary
   },
   chipText: {
-    color: theme.colors.primaryDark,
+    color: lightSurfaceTextColor,
     fontWeight: "800",
     textAlign: "center"
   },
@@ -6960,7 +6960,7 @@ function createStyles(theme: KuraTheme) {
     borderColor: theme.colors.primary
   },
   frequencyChipText: {
-    color: theme.colors.primaryDark,
+    color: lightSurfaceTextColor,
     fontWeight: "900",
     textAlign: "center"
   },
@@ -6990,7 +6990,7 @@ function createStyles(theme: KuraTheme) {
     lineHeight: 15,
     fontWeight: "900",
     textAlign: "center",
-    color: theme.colors.primaryDark
+    color: lightSurfaceTextColor
   },
   segmentTextActive: {
     color: theme.colors.white
@@ -7144,7 +7144,7 @@ function createStyles(theme: KuraTheme) {
     borderColor: theme.colors.primary
   },
   pickerOptionText: {
-    color: theme.colors.primaryDark,
+    color: lightSurfaceTextColor,
     fontWeight: "900",
     textAlign: "center"
   },
@@ -7220,7 +7220,7 @@ function createStyles(theme: KuraTheme) {
     backgroundColor: theme.colors.primary
   },
   dropdownOptionText: {
-    color: theme.colors.primaryDark,
+    color: lightSurfaceTextColor,
     fontWeight: "800",
     textAlign: "center"
   },
@@ -7637,7 +7637,7 @@ function createStyles(theme: KuraTheme) {
     borderColor: theme.colors.primary
   },
   inventoryModeText: {
-    color: theme.colors.primaryDark,
+    color: lightSurfaceTextColor,
     fontWeight: "900",
     textAlign: "center"
   },
